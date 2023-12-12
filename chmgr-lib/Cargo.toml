@@ -1,0 +1,20 @@
+[package]
+name = "libchmgr"
+version = "0.0.1"
+edition = "2021"
+authors = ["Fulup Le Foll <fulup@iot.bzh>"]
+publish = false
+
+[dependencies]
+afbv4 = {git= "https://github.com/redpesk-common/afb-librust", branch="master", optional = true}
+
+[build-dependencies]
+bindgen    = ">=0.69"
+cc = "1"
+
+[lib]
+name = "libchmgr"
+crate-type = ["lib"]
+path = "src/libso.rs"
+
+

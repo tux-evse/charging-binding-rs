@@ -17,16 +17,6 @@ pub(crate) fn to_static_str(value: String) -> &'static str {
     Box::leak(value.into_boxed_str())
 }
 
-AfbDataConverter!(iso_state, IsoState);
-use serde::{Deserialize, Serialize};
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "SCREAMING-KEBAB-CASE", tag = "action")]
-pub(crate) enum IsoState {
-    PlugLock,
-    PlugErr,
-    PlugIdle,
-}
-
 pub struct BindingCfg {}
 
 // Binding init callback started at binding load time before any API exist
@@ -35,7 +25,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     afb_log_msg!(Info, rootv4, "config:{}", jconf);
 
     // add binding custom converter
-    iso_state::register()?;
+    types_register()?;
 
     let uid = if let Ok(value) = jconf.get::<String>("uid") {
         to_static_str(value)

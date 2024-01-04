@@ -74,7 +74,7 @@ pub struct VehicleState {
     pub iec_state: IecState,
 }
 
-pub fn types_register() -> Result<(),AfbError> {
+pub fn chmgr_register() -> Result<(),AfbError> {
     iec_state::register()?;
     plug_state::register()?;
     vehicle_state::register()?;

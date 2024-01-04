@@ -12,6 +12,7 @@
 
 use crate::prelude::*;
 use afbv4::prelude::*;
+use typesv4::prelude::*;
 
 pub(crate) fn to_static_str(value: String) -> &'static str {
     Box::leak(value.into_boxed_str())
@@ -25,7 +26,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     afb_log_msg!(Info, rootv4, "config:{}", jconf);
 
     // add binding custom converter
-    types_register()?;
+    chmgr_register()?;
 
     let uid = if let Ok(value) = jconf.get::<String>("uid") {
         to_static_str(value)

@@ -1,0 +1,151 @@
+{
+    "binding": [
+        {
+            "path": "/usr/redpesk/modbus-binding/lib/afb-modbus.so",
+            "reference": "https://xn--stromzhler-v5a.eu/media/pdf/93/17/d7/SDM72DM-V2.pdf",
+            "metadata": {
+                "uid": "modbus",
+                "version": "1.0",
+                "api": "modbus",
+                "info": "Generic Eastron default Test Config",
+            },
+            "modbus": {
+                "uid": "Eastron-SDM72D",
+                "info": "Three Phase Four Wire Energy Meter ",
+                "uri": "tty://dev/ttyUSB_RS485:19200",
+                "prefix": "SDM72D",
+                "slaveid": 1,
+                "timeout": 250,
+                "autostart": 1,
+                "privilege": "Eastron:Modbus",
+                "hertz": 1,
+                "sensors": [
+                    {
+                        "uid": "Volt-L1",
+                        "register": 0,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA",
+                        "sample": [
+                            {
+                                "action": "read"
+                            },
+                            {
+                                "action": "subscribe"
+                            }
+                        ]
+                    },
+                    {
+                        "uid": "Volt-L2",
+                        "register": 2,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Volt-L3",
+                        "register": 4,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Amp-L1",
+                        "register": 6,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Amp-L2",
+                        "register": 8,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Amp-L3",
+                        "register": 10,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Volt-Avr",
+                        "register": 42,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Amp-Avr",
+                        "register": 76,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Amp-Total",
+                        "register": 48,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Watt-L1",
+                        "info": "Watts",
+                        "register": 12,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Watt-L2",
+                        "register": 14,
+                        "info": "Watts",
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Watt-L3",
+                        "register": 16,
+                        "info": "Watts",
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Watt-Total",
+                        "register": 52,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Energy-Total",
+                        "register": 342,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Energy-Session",
+                        "register": 384,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "Energy-Reset",
+                        "register": 61456,
+                        "type": "Coil_Holding",
+                        "sample": {
+                            "action": "write",
+                            "data": 3
+                        },
+                        "format": "INT32"
+                    },
+                    {
+                        "uid": "Frequency-Supply",
+                        "register": 70,
+                        "type": "Register_input",
+                        "format": "FLOAT_DCBA"
+                    },
+                    {
+                        "uid": "SERIAL-NUMBER",
+                        "info": "Device Serial number",
+                        "type": "Register_Holding",
+                        "format": "UINT32",
+                        "register": 64512
+                    }
+                ]
+            }
+        }
+    ]
+}

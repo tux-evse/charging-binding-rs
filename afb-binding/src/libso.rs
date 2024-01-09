@@ -18,9 +18,6 @@
 #[cfg(not(afbv4))]
 extern crate afbv4;
 
-#[path = "types.rs"]
-mod types;
-
 
 #[path = "verbs.rs"]
 mod verbs;
@@ -30,7 +27,6 @@ mod binding;
 
 pub(crate) mod prelude {
    // pub(crate) use crate::codec::*;
-    pub use crate::types::*;
     pub(crate) use crate::verbs::*;
     pub(crate) use crate::binding::*;
 }

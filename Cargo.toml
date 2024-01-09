@@ -2,7 +2,7 @@
 resolver = "2"
 
 members = [
-    # "chmgr-lib",
+    "chmgr-lib",
     "afb-types",
     "afb-binding",
 ]

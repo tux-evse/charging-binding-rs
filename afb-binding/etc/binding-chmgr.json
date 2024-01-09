@@ -1,17 +1,10 @@
 {
-    "name": "afb-chmgr",
-    "no-ldpaths": true,
-    "alias": [
-        "/devtools:/usr/share/afb-ui-devtools/binder"
-    ],
-    "monitoring": true,
-    "tracereq": "none",
     "binding": [
         {
             "uid": "charging-manager",
             "api": "chmgr",
             "path": "/home/fulup/.cargo/build/debug/libafb_chmgr.so",
-            "info": "set/get api",
+            "info": "charging manager public api",
             "permission": "acl:chmgr"
         }
     ]

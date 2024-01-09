@@ -19,8 +19,8 @@
 extern crate afbv4;
 
 #[path = "chmgr-types.rs"]
-mod chmrg;
+mod chmgr;
 
 pub mod prelude {
-    pub use crate::chmrg::*;
+    pub use crate::chmgr::*;
 }

@@ -55,6 +55,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     chmgr_register()?;
     am62x_registers()?;
     slac_registers()?;
+    engy_registers()?;
 
     let uid = if let Ok(value) = jconf.get::<String>("uid") {
         to_static_str(value)

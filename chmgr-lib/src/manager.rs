@@ -35,16 +35,6 @@ pub struct ManagerHandle {
 }
 
 impl ManagerHandle {
-    #[track_caller]
-    pub fn get_state(&self) -> Result<RefMut<'_,ManagerState>, AfbError> {
-        match self.data_set.try_borrow_mut() {
-            Err(_) => return afb_error!("charging-manager-update", "fail to access &mut data_set"),
-            Ok(value) => Ok(value),
-        }
-    }
-}
-
-impl ManagerHandle {
     pub fn new(auth_api: &'static str, iec_api: &'static str) -> &'static mut Self {
         let handle = ManagerHandle {
             auth_api,
@@ -54,6 +44,14 @@ impl ManagerHandle {
 
         // return a static handle to prevent Rust from complaining when moving/sharing it
         Box::leak(Box::new(handle))
+    }
+
+    #[track_caller]
+    fn get_state(&self) -> Result<RefMut<'_, ManagerState>, AfbError> {
+        match self.data_set.try_borrow_mut() {
+            Err(_) => return afb_error!("charging-manager-update", "fail to access &mut data_set"),
+            Ok(value) => Ok(value),
+        }
     }
 
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
@@ -66,7 +64,7 @@ impl ManagerHandle {
                 afb_log_msg!(Notice, evt, "Requesting NFC get_contract");
                 // if auth check is ok then allow power
                 AfbSubCall::call_sync(evt.get_api(), self.auth_api, "get-contract", AFB_NO_DATA)?;
-                data_set.authenticated= true;
+                data_set.authenticated = true;
             }
 
             _ => {}

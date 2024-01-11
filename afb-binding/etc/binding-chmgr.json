@@ -8,7 +8,8 @@
             "permission": "acl:chmgr",
             "slac_api": "slac",
             "iec_api": "am62x",
-            "auth_api": "auth"
+            "auth_api": "auth",
+            "energy_api": "engy"
         }
     ]
 }

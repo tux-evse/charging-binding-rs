@@ -22,11 +22,13 @@ pub struct BindingCfg {
     pub iec_api: &'static str,
     pub slac_api: &'static str,
     pub auth_api: &'static str,
+    pub engy_api: &'static str,
 }
 
 pub struct ApiUserData {
     pub iec_api: &'static str,
     pub slac_api: &'static str,
+    pub engy_api: &'static str,
 }
 
 impl AfbApiControls for ApiUserData {
@@ -34,6 +36,7 @@ impl AfbApiControls for ApiUserData {
     fn start(&mut self, api: &AfbApi) -> Result<(), AfbError> {
         AfbSubCall::call_sync(api, self.iec_api, "subscribe", true)?;
         AfbSubCall::call_sync(api, self.slac_api, "subscribe", true)?;
+        AfbSubCall::call_sync(api, self.engy_api, "adsp", "'action':'subscribe'")?;
         Ok(())
     }
 
@@ -74,10 +77,12 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     let iec_api = to_static_str(jconf.get::<String>("iec_api")?);
     let slac_api = to_static_str(jconf.get::<String>("slac_api")?);
     let auth_api = to_static_str(jconf.get::<String>("auth_api")?);
+    let engy_api = to_static_str(jconf.get::<String>("energy_api")?);
     let config = BindingCfg {
         iec_api,
         slac_api,
         auth_api,
+        engy_api,
     };
 
     // create backend API
@@ -85,7 +90,8 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         .set_info(info)
         .require_api(iec_api)
         .require_api(slac_api)
-        .set_callback(Box::new(ApiUserData { iec_api, slac_api }));
+        .require_api(engy_api)
+        .set_callback(Box::new(ApiUserData { iec_api, slac_api, engy_api }));
 
     if let Ok(value) = jconf.get::<String>("permission") {
         api.set_permission(AfbPermission::new(to_static_str(value)));

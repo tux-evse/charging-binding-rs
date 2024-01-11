@@ -15,6 +15,22 @@ use afbv4::prelude::*;
 use charging::prelude::*;
 use typesv4::prelude::*;
 
+struct EngyEvtCtx {
+    evt: &'static AfbEvent,
+    mgr: &'static ManagerHandle,
+}
+AfbEventRegister!(EngyEvtCtrl, engy_event_cb, EngyEvtCtx);
+fn engy_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut EngyEvtCtx) -> Result<(), AfbError> {
+    let msg = args.get::<&MeterDataSet>(0)?;
+
+    // forward engy events to potential listeners
+    afb_log_msg!(Debug, evt, "engy_evt:{:?}", msg);
+    ctx.evt.push(msg.clone());
+    ctx.mgr.engy(evt, msg)?;
+
+    Ok(())
+}
+
 struct SlacEvtCtx {
     evt: &'static AfbEvent,
     mgr: &'static ManagerHandle,
@@ -73,7 +89,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         .set_usage("true|false")
         .finalize()?;
         // create charging manger handle
-    let manager = ManagerHandle::new(config.auth_api, config.iec_api);
+    let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api);
 
     let iec_handler = AfbEvtHandler::new("iec-evt")
         .set_pattern(to_static_str(format!("{}/*", config.iec_api)))
@@ -88,6 +104,12 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         .set_callback(Box::new(SlacEvtCtx { evt: event, mgr: manager }))
         .finalize()?;
 
+    let engy_handler = AfbEvtHandler::new("engy-evt")
+        .set_pattern(to_static_str(format!("{}/*", config.engy_api)))
+        .set_callback(Box::new(EngyEvtCtx { evt: event, mgr: manager }))
+        .finalize()?;
+
+    api.add_evt_handler(engy_handler);
     api.add_evt_handler(iec_handler);
     api.add_evt_handler(slac_handler);
     api.add_event(event);

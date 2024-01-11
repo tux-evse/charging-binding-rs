@@ -32,13 +32,15 @@ pub struct ManagerHandle {
     data_set: RefCell<ManagerState>,
     auth_api: &'static str,
     iec_api: &'static str,
+    engy_api: &'static str,
 }
 
 impl ManagerHandle {
-    pub fn new(auth_api: &'static str, iec_api: &'static str) -> &'static mut Self {
+    pub fn new(auth_api: &'static str, iec_api: &'static str, engy_api: &'static str) -> &'static mut Self {
         let handle = ManagerHandle {
             auth_api,
             iec_api,
+            engy_api,
             data_set: RefCell::new(ManagerState::default()),
         };
 
@@ -73,6 +75,23 @@ impl ManagerHandle {
         Ok(())
     }
 
+    pub fn engy(&self, evt: &AfbEventMsg, msg: &MeterDataSet) -> Result<(), AfbError> {
+        let mut data_set = self.get_state()?;
+
+        match msg.tag {
+            MeterTagSet::OverCurrent => {
+                // in current implementation overcurrent
+                afb_log_msg!(Warning, evt, "energy over-current stop charge");
+                AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
+                data_set.authenticated = true;
+            }
+
+            _ => {}
+        }
+
+        Ok(())
+    }
+
     pub fn iec(&self, evt: &AfbEventMsg, msg: &Iec6185Msg) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
 
@@ -87,7 +106,11 @@ impl ManagerHandle {
                 data_set.imax = 0;
             }
             Iec6185Msg::RelayOn(_value) => {}
-            Iec6185Msg::Plugged(_value) => {}
+            Iec6185Msg::Plugged(value) => {
+                if *value {
+                   AfbSubCall::call_sync(evt.get_api(), self.engy_api, "Energy-Session", "'action':'reset'")?;
+                }
+            }
         }
         Ok(())
     }

@@ -6,7 +6,7 @@
         "evt": "iso203",
         "path": "/usr/redpesk/slac-binding-rs/lib/libafb_slac.so",
         "info": "RUST Slac ISO15118-3",
-        "iec_api": "iec",
+        "iec_api": "am62x",
         "iso_itf": "eth2"
     }
   ]

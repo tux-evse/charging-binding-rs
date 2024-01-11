@@ -36,7 +36,7 @@ impl AfbApiControls for ApiUserData {
     fn start(&mut self, api: &AfbApi) -> Result<(), AfbError> {
         AfbSubCall::call_sync(api, self.iec_api, "subscribe", true)?;
         AfbSubCall::call_sync(api, self.slac_api, "subscribe", true)?;
-        AfbSubCall::call_sync(api, self.engy_api, "adsp", EnergyAction::RESET)?;
+        AfbSubCall::call_sync(api, self.engy_api, "adsp", EnergyAction::SUBSCRIBE)?;
         Ok(())
     }
 

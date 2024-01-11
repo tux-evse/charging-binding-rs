@@ -108,7 +108,7 @@ impl ManagerHandle {
             Iec6185Msg::RelayOn(_value) => {}
             Iec6185Msg::Plugged(value) => {
                 if *value {
-                   AfbSubCall::call_sync(evt.get_api(), self.engy_api, "Energy-Session", "'action':'reset'")?;
+                   AfbSubCall::call_sync(evt.get_api(), self.engy_api, "Energy-Session", EnergyAction::RESET)?;
                 }
             }
         }

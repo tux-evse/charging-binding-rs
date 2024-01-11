@@ -1,0 +1,13 @@
+{
+  "binding": [
+    {
+        "uid": "slac-api",
+        "api": "slac",
+        "evt": "iso203",
+        "path": "/usr/redpesk/slac-binding-rs/lib/libafb_slac.so",
+        "info": "RUST Slac ISO15118-3",
+        "iec_api": "iec",
+        "iso_itf": "eth2"
+    }
+  ]
+}

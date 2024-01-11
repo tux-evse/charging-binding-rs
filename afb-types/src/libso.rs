@@ -21,6 +21,14 @@ extern crate afbv4;
 #[path = "chmgr-types.rs"]
 mod chmgr;
 
+#[path = "am62x-types.rs"]
+mod am62x;
+
+#[path = "slac-types.rs"]
+mod slac;
+
 pub mod prelude {
     pub use crate::chmgr::*;
+    pub use crate::am62x::*;
+    pub use crate::slac::*;
 }

@@ -4,8 +4,11 @@
             "uid": "charging-manager",
             "api": "chmgr",
             "path": "/home/fulup/.cargo/build/debug/libafb_chmgr.so",
-            "info": "charging manager public api",
-            "permission": "acl:chmgr"
+            "info": "set/get api",
+            "permission": "acl:chmgr",
+            "slac_api": "slac",
+            "iec_api": "am62x",
+            "auth_api": "auth"
         }
     ]
 }

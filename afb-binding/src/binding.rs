@@ -18,7 +18,30 @@ pub(crate) fn to_static_str(value: String) -> &'static str {
     Box::leak(value.into_boxed_str())
 }
 
-pub struct BindingCfg {}
+pub struct BindingCfg {
+    pub iec_api: &'static str,
+    pub slac_api: &'static str,
+    pub auth_api: &'static str,
+}
+
+pub struct ApiUserData {
+    pub iec_api: &'static str,
+    pub slac_api: &'static str,
+}
+
+impl AfbApiControls for ApiUserData {
+    // the API is created and ready. At this level user may subcall api(s) declare as dependencies
+    fn start(&mut self, api: &AfbApi) -> Result<(), AfbError> {
+        AfbSubCall::call_sync(api, self.iec_api, "subscribe", true)?;
+        AfbSubCall::call_sync(api, self.slac_api, "subscribe", true)?;
+        Ok(())
+    }
+
+    // mandatory unsed declaration
+    fn as_any(&mut self) -> &mut dyn Any {
+        self
+    }
+}
 
 // Binding init callback started at binding load time before any API exist
 // -----------------------------------------
@@ -27,6 +50,8 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
 
     // add binding custom converter
     chmgr_register()?;
+    am62x_registers()?;
+    slac_registers()?;
 
     let uid = if let Ok(value) = jconf.get::<String>("uid") {
         to_static_str(value)
@@ -46,19 +71,27 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         ""
     };
 
-    let permission = if let Ok(value) = jconf.get::<String>("permission") {
-        AfbPermission::new(to_static_str(value))
-    } else {
-        AfbPermission::new("acl:chmgr:client")
-    };
-
+    let iec_api = to_static_str(jconf.get::<String>("iec_api")?);
+    let slac_api = to_static_str(jconf.get::<String>("slac_api")?);
+    let auth_api = to_static_str(jconf.get::<String>("auth_api")?);
     let config = BindingCfg {
+        iec_api,
+        slac_api,
+        auth_api,
     };
 
     // create backend API
-    let api = AfbApi::new(api).set_info(info).set_permission(permission);
-    register_verbs(api, config)?;
+    let api = AfbApi::new(api)
+        .set_info(info)
+        .require_api(iec_api)
+        .require_api(slac_api)
+        .set_callback(Box::new(ApiUserData { iec_api, slac_api }));
 
+    if let Ok(value) = jconf.get::<String>("permission") {
+        api.set_permission(AfbPermission::new(to_static_str(value)));
+    };
+
+    register_verbs(api, config)?;
     Ok(api.finalize()?)
 }
 

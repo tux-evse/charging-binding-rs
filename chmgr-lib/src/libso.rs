@@ -18,7 +18,9 @@
 #[cfg(not(afbv4))]
 extern crate afbv4;
 
+#[path = "manager.rs"]
+mod manager;
 
 pub mod prelude {
-    //pub use crate::chmgr::*;
+    pub use crate::manager::*;
 }

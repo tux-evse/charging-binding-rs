@@ -120,7 +120,7 @@ fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Resul
 
 pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
     let msg_evt = AfbEvent::new("msg");
-    let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api, event);
+    let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api, msg_evt);
 
     let state_event = AfbEvent::new("state");
     AfbTimer::new("tic-timer")

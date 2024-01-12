@@ -95,14 +95,15 @@ fn state_request_cb(
         ChargingAction::SUBSCRIBE => {
             afb_log_msg!(Notice, rqt, "Subscribe {}", ctx.evt.get_uid());
             ctx.evt.subscribe(rqt)?;
+            rqt.reply(AFB_NO_DATA, 0);
         }
 
         ChargingAction::UNSUBSCRIBE => {
             afb_log_msg!(Notice, rqt, "Unsubscribe {}", ctx.evt.get_uid());
             ctx.evt.unsubscribe(rqt)?;
+            rqt.reply(AFB_NO_DATA, 0);
         }
     }
-    rqt.reply(AFB_NO_DATA, 0);
     Ok(())
 }
 

@@ -23,6 +23,7 @@ pub struct BindingCfg {
     pub slac_api: &'static str,
     pub auth_api: &'static str,
     pub engy_api: &'static str,
+    pub tic: u32,
 }
 
 pub struct ApiUserData {
@@ -56,6 +57,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     am62x_registers()?;
     slac_registers()?;
     engy_registers()?;
+    auth_registers()?;
 
     let uid = if let Ok(value) = jconf.get::<String>("uid") {
         to_static_str(value)
@@ -79,11 +81,13 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     let slac_api = to_static_str(jconf.get::<String>("slac_api")?);
     let auth_api = to_static_str(jconf.get::<String>("auth_api")?);
     let engy_api = to_static_str(jconf.get::<String>("energy_api")?);
+    let tic = to_static_str(jconf.get::<u32>("tic")?);
     let config = BindingCfg {
         iec_api,
         slac_api,
         auth_api,
         engy_api,
+        tic,
     };
 
     // create backend API

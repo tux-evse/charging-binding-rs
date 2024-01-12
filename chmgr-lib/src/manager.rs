@@ -14,34 +14,23 @@ use afbv4::prelude::*;
 use std::cell::{RefCell, RefMut};
 use typesv4::prelude::*;
 
-pub struct ManagerState {
-    imax: u32,
-    authenticated: bool,
-}
-
-impl ManagerState {
-    pub fn default() -> Self {
-        ManagerState {
-            imax: 0,
-            authenticated: false,
-        }
-    }
-}
 
 pub struct ManagerHandle {
-    data_set: RefCell<ManagerState>,
+    data_set: RefCell<ChargingState>,
     auth_api: &'static str,
     iec_api: &'static str,
     engy_api: &'static str,
+    event: &'static AfbEvent,
 }
 
 impl ManagerHandle {
-    pub fn new(auth_api: &'static str, iec_api: &'static str, engy_api: &'static str) -> &'static mut Self {
+    pub fn new(auth_api: &'static str, iec_api: &'static str, engy_api: &'static str, event: &'static AfbEvent) -> &'static mut Self {
         let handle = ManagerHandle {
             auth_api,
             iec_api,
             engy_api,
-            data_set: RefCell::new(ManagerState::default()),
+            event,
+            data_set: RefCell::new(ChargingState::default()),
         };
 
         // return a static handle to prevent Rust from complaining when moving/sharing it
@@ -49,24 +38,51 @@ impl ManagerHandle {
     }
 
     #[track_caller]
-    fn get_state(&self) -> Result<RefMut<'_, ManagerState>, AfbError> {
+    pub fn get_state(&self) -> Result<RefMut<'_, ChargingState>, AfbError> {
         match self.data_set.try_borrow_mut() {
             Err(_) => return afb_error!("charging-manager-update", "fail to access &mut data_set"),
             Ok(value) => Ok(value),
         }
     }
 
-    pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
+    pub fn push_state(&self) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
+        self.event.push(data_set.clone());
+        Ok(())
+    }
+
+    fn nfc_auth(&self) -> Result<(), AfbError> {
+                let mut data_set = self.get_state()?;
+
+                afb_log_msg!(Notice, self.event, "Requesting NFC get_contract");
+                data_set.auth = AuthState::Pending;
+                self.event.push(ChargingMsg::Auth(data_set.auth));
+                // if auth check is ok then allow power
+                let contract= match AfbSubCall::call_sync(self.event.get_apiv4(), self.auth_api, "get-contract", AFB_NO_DATA) {
+                    Ok(response) => {
+                        data_set.auth = AuthState::Done;
+                        self.event.push(ChargingMsg::Auth(data_set.auth));
+                        response.get::<JsoncObj>(0)?.index::<String>(0)
+                    }
+                    Err(_) => {
+                        data_set.auth = AuthState::Fail;
+                        self.event.push(ChargingMsg::Auth(data_set.auth));
+                       return afb_error!("charg-iec-auth", "fail to authenticate with NFC")
+                    }
+                };
+                Ok(())
+    }
+
+    pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
 
         match msg {
             SlacStatus::MATCHED => { /* start ISO15118 */ }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
-                // roll back to NFC authentication
-                afb_log_msg!(Notice, evt, "Requesting NFC get_contract");
-                // if auth check is ok then allow power
-                AfbSubCall::call_sync(evt.get_api(), self.auth_api, "get-contract", AFB_NO_DATA)?;
-                data_set.authenticated = true;
+                self.event.push(ChargingMsg::Iso(IsoState::Iec));
+                self.nfc_auth()?;
+
+                AfbSubCall::call_sync(self.event.get_apiv4(), self.iec_api, "power", true)
+                self.event.push(ChargingMsg::Power(PowerRequest::Start));
             }
 
             _ => {}

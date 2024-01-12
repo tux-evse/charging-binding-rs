@@ -10,12 +10,13 @@
  *
  */
 
+use crate::prelude::*;
 use afbv4::prelude::*;
 use serde::{Deserialize, Serialize};
 
 AfbDataConverter!(error_state, ErrorState);
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "SCREAMING-KEBAB-CASE", untagged)]
+#[serde(rename_all = "lowercase")]
 pub enum ErrorState {
     ErrE,
     ErrDf,
@@ -26,18 +27,9 @@ pub enum ErrorState {
     ErrVentilation,
 }
 
-AfbDataConverter!(iec_state, IecState);
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "SCREAMING-KEBAB-CASE", tag = "action")]
-pub enum IecState {
-    Bdf,
-    Ef,
-    Unset,
-}
-
 AfbDataConverter!(power_request, PowerRequest);
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "SCREAMING-KEBAB-CASE", tag = "action")]
+#[serde(rename_all = "lowercase")]
 pub enum PowerRequest {
     Start,
     Stop,
@@ -45,7 +37,7 @@ pub enum PowerRequest {
 
 AfbDataConverter!(plug_state, PlugState);
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "SCREAMING-KEBAB-CASE", tag = "action")]
+#[serde(rename_all = "lowercase")]
 pub enum PlugState {
     PlugIn,
     Lock,
@@ -55,29 +47,67 @@ pub enum PlugState {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "SCREAMING-KEBAB-CASE", tag = "action")]
-pub enum Iso15118State {
+#[serde(rename_all = "lowercase")]
+pub enum IsoState {
     Iso20,
     Iso2,
     Iec,
     Unset,
 }
 
-AfbDataConverter!(vehicle_state, VehicleState);
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "kebab-case", tag = "action")]
-pub struct VehicleState {
-    pub plugged: PlugState,
-    pub power_request: PowerRequest,
-    pub power_imax: u32,
-    pub iso15118: Iso15118State,
-    pub iec_state: IecState,
+AfbDataConverter!(charging_event, ChargingMsg);
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum ChargingMsg {
+    Plugged(PlugState),
+    Power(PowerRequest),
+    Iso(IsoState),
+    Auth(AuthState),
+    State(ChargingState),
 }
 
-pub fn chmgr_register() -> Result<(),AfbError> {
-    iec_state::register()?;
+AfbDataConverter!(charging_state, ChargingState);
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "lowercase")]
+pub struct ChargingState {
+    #[serde(skip)]
+    pub updated: bool,
+    pub imax: u32,
+    pub plugged: PlugState,
+    pub power: PowerRequest,
+    pub iso: IsoState,
+    pub auth: AuthState,
+    pub contract:String,
+}
+
+impl ChargingState {
+    pub fn default() -> Self {
+        ChargingState {
+            updated: false,
+            imax: 0,
+            plugged: PlugState::Unknown,
+            power: PowerRequest::Stop,
+            iso: IsoState::Unset,
+            auth: AuthState::Idle,
+            contract: String::new(),
+        }
+    }
+}
+
+AfbDataConverter!(charging_actions, ChargingAction);
+#[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(rename_all = "lowercase", tag = "action")]
+pub enum ChargingAction {
+    #[default]
+    READ,
+    SUBSCRIBE,
+    UNSUBSCRIBE,
+}
+
+pub fn chmgr_register() -> Result<(), AfbError> {
+    charging_actions::register()?;
     plug_state::register()?;
-    vehicle_state::register()?;
+    charging_state::register()?;
     error_state::register()?;
     power_request::register()?;
 

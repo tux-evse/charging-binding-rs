@@ -16,23 +16,20 @@ use charging::prelude::*;
 use typesv4::prelude::*;
 
 struct EngyEvtCtx {
-    evt: &'static AfbEvent,
     mgr: &'static ManagerHandle,
 }
 AfbEventRegister!(EngyEvtCtrl, engy_event_cb, EngyEvtCtx);
 fn engy_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut EngyEvtCtx) -> Result<(), AfbError> {
-    let msg = args.get::<&MeterDataSet>(0)?;
+    let msg = args.get::<&StateDataSet>(0)?;
 
     // forward engy events to potential listeners
     afb_log_msg!(Debug, evt, "engy_evt:{:?}", msg);
-    ctx.evt.push(msg.clone());
     ctx.mgr.engy(evt, msg)?;
 
     Ok(())
 }
 
 struct SlacEvtCtx {
-    evt: &'static AfbEvent,
     mgr: &'static ManagerHandle,
 }
 AfbEventRegister!(SlacEvtCtrl, slac_event_cb, SlacEvtCtx);
@@ -41,7 +38,6 @@ fn slac_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut SlacEvtCtx) -> Res
 
     // forward slac events to potential listeners
     afb_log_msg!(Debug, evt, "slac_evt:{:?}", msg);
-    ctx.evt.push(msg.clone());
     ctx.mgr.slac(evt, msg)?;
 
     Ok(())
@@ -49,14 +45,12 @@ fn slac_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut SlacEvtCtx) -> Res
 
 struct IecEvtCtx {
     mgr: &'static ManagerHandle,
-    evt: &'static AfbEvent,
 }
 AfbEventRegister!(IecEvtCtrl, iec_event_cb, IecEvtCtx);
 fn iec_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut IecEvtCtx) -> Result<(), AfbError> {
     let msg = args.get::<&Iec6185Msg>(0)?;
 
     afb_log_msg!(Debug, evt, "iec_evt:{:?}", msg.clone());
-    ctx.evt.push(msg.clone());
     ctx.mgr.iec(evt, msg)?;
 
     Ok(())
@@ -81,32 +75,97 @@ fn subscribe_callback(
     Ok(())
 }
 
+struct StateRequestCtx {
+    mgr: &'static ManagerHandle,
+    evt: &'static AfbEvent,
+}
+AfbVerbRegister!(StateRequestVerb, state_request_cb, StateRequestCtx);
+fn state_request_cb(
+    rqt: &AfbRequest,
+    args: &AfbData,
+    ctx: &mut StateRequestCtx,
+) -> Result<(), AfbError> {
+
+    match args.get::<&ChargingAction>(0)? {
+        ChargingAction::READ => {
+            let mut data_set = mgr.get_state()?;
+            data_set.tag = data_set.tag.clone();
+            rqt.reply(data_set.clone(), 0);
+        }
+
+        ChargingAction::SUBSCRIBE => {
+            afb_log_msg!(Notice, rqt, "Subscribe {}", ctx.evt.get_uid());
+            ctx.evt.subscribe(rqt)?;
+        }
+
+        ChargingAction::UNSUBSCRIBE => {
+            afb_log_msg!(Notice, rqt, "Unsubscribe {}", ctx.evt.get_uid());
+            ctx.evt.unsubscribe(rqt)?;
+        }
+    }
+    rqt.reply(AFB_NO_DATA, 0);
+    Ok(())
+}
+
+struct TimerCtx {
+    mgr: &'static ManagerHandle,
+    evt: &'static AfbEvent,
+}
+// send charging state every tic ms.
+AfbTimerRegister!(TimerCtrl, timer_callback, TimerCtx);
+fn timer_callback(timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Result<(), AfbError> {
+    let state= ctx.mgr.get_state()?;
+    ctx.evf.push(state.clone());
+    Ok(())
+}
+
 pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
-    let event = AfbEvent::new("evt");
-    let subscribe = AfbVerb::new("subscribe")
+    let event = AfbEvent::new("msg");
+    let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api, event);
+
+    // timer send periodical state data
+    AfbTimer::new(config.uid)
+        .set_period(config.tic)
+        .set_decount(0)
+        .set_callback(Box::new(TimerCtx {
+           mgr: manager,
+           evt: state_event,
+        }))
+        .start()?;
+
+    let state_event = AfbEvent::new("state");
+    let state_verb = AfbVerb::new("charging-state")
+        .set_name("state")
+        .set_info("current charging state")
+        .set_action("['read','subscribe','unsubscribe']")?
+        .set_callback(Box::new(StateRequestCtrl {
+            mgr: manager,
+            evt: state_event,
+        }))
+        .finalize()?;
+
+    let subscribe = AfbVerb::new("subscribe-msg")
+        .set_name("subscribe")
         .set_callback(Box::new(SubscribeCtrl { event }))
-        .set_info("subscribe Iec6185 event")
+        .set_info("subscribe charging events")
         .set_usage("true|false")
         .finalize()?;
-        // create charging manger handle
-    let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api);
 
     let iec_handler = AfbEvtHandler::new("iec-evt")
         .set_pattern(to_static_str(format!("{}/*", config.iec_api)))
         .set_callback(Box::new(IecEvtCtx {
-            evt: event,
-            mgr: manager,
+            mgr: manager
         }))
         .finalize()?;
 
     let slac_handler = AfbEvtHandler::new("slac-evt")
         .set_pattern(to_static_str(format!("{}/*", config.slac_api)))
-        .set_callback(Box::new(SlacEvtCtx { evt: event, mgr: manager }))
+        .set_callback(Box::new(SlacEvtCtx { mgr: manager }))
         .finalize()?;
 
     let engy_handler = AfbEvtHandler::new("engy-evt")
         .set_pattern(to_static_str(format!("{}/*", config.engy_api)))
-        .set_callback(Box::new(EngyEvtCtx { evt: event, mgr: manager }))
+        .set_callback(Box::new(EngyEvtCtx {mgr: manager }))
         .finalize()?;
 
     api.add_evt_handler(engy_handler);

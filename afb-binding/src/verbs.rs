@@ -119,7 +119,7 @@ fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Resul
 }
 
 pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
-    let event = AfbEvent::new("msg");
+    let msg_evt = AfbEvent::new("msg");
     let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api, event);
 
     let state_event = AfbEvent::new("state");
@@ -144,7 +144,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
 
     let subscribe = AfbVerb::new("subscribe-msg")
         .set_name("subscribe")
-        .set_callback(Box::new(SubscribeCtx { event }))
+        .set_callback(Box::new(SubscribeCtx { event: msg_evt }))
         .set_info("subscribe charging events")
         .set_usage("true|false")
         .finalize()?;
@@ -169,7 +169,8 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     api.add_evt_handler(engy_handler);
     api.add_evt_handler(iec_handler);
     api.add_evt_handler(slac_handler);
-    api.add_event(event);
+    api.add_event(msg_evt);
+    api.add_event(state_event);
     api.add_verb(state_verb);
     api.add_verb(subscribe);
 

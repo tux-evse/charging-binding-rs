@@ -104,7 +104,7 @@ pub enum ChargingAction {
     UNSUBSCRIBE,
 }
 
-pub fn chmgr_register() -> Result<(), AfbError> {
+pub fn chmgr_registers() -> Result<(), AfbError> {
     charging_actions::register()?;
     plug_state::register()?;
     charging_state::register()?;

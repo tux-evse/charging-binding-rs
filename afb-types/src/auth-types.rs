@@ -24,7 +24,7 @@ pub enum AuthState {
 }
 
 
-pub fn auth_register() -> Result<(),AfbError> {
+pub fn auth_registers() -> Result<(),AfbError> {
     auth_state::register()?;
 
     Ok(())

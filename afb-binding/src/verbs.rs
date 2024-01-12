@@ -20,7 +20,7 @@ struct EngyEvtCtx {
 }
 AfbEventRegister!(EngyEvtCtrl, engy_event_cb, EngyEvtCtx);
 fn engy_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut EngyEvtCtx) -> Result<(), AfbError> {
-    let msg = args.get::<&StateDataSet>(0)?;
+    let msg = args.get::<&MeterDataSet>(0)?;
 
     // forward engy events to potential listeners
     afb_log_msg!(Debug, evt, "engy_evt:{:?}", msg);
@@ -56,14 +56,14 @@ fn iec_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut IecEvtCtx) -> Resul
     Ok(())
 }
 
-struct SubscribeData {
+struct SubscribeCtx {
     event: &'static AfbEvent,
 }
-AfbVerbRegister!(SubscribeCtrl, subscribe_callback, SubscribeData);
+AfbVerbRegister!(SubscribeCtrl, subscribe_callback, SubscribeCtx);
 fn subscribe_callback(
     request: &AfbRequest,
     args: &AfbData,
-    ctx: &mut SubscribeData,
+    ctx: &mut SubscribeCtx,
 ) -> Result<(), AfbError> {
     let subcription = args.get::<bool>(0)?;
     if subcription {
@@ -88,8 +88,7 @@ fn state_request_cb(
 
     match args.get::<&ChargingAction>(0)? {
         ChargingAction::READ => {
-            let mut data_set = mgr.get_state()?;
-            data_set.tag = data_set.tag.clone();
+            let data_set = ctx.mgr.get_state()?;
             rqt.reply(data_set.clone(), 0);
         }
 
@@ -113,9 +112,9 @@ struct TimerCtx {
 }
 // send charging state every tic ms.
 AfbTimerRegister!(TimerCtrl, timer_callback, TimerCtx);
-fn timer_callback(timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Result<(), AfbError> {
+fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Result<(), AfbError> {
     let state= ctx.mgr.get_state()?;
-    ctx.evf.push(state.clone());
+    ctx.evt.push(state.clone());
     Ok(())
 }
 
@@ -123,8 +122,8 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     let event = AfbEvent::new("msg");
     let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api, event);
 
-    // timer send periodical state data
-    AfbTimer::new(config.uid)
+    let state_event = AfbEvent::new("state");
+    AfbTimer::new("tic-timer")
         .set_period(config.tic)
         .set_decount(0)
         .set_callback(Box::new(TimerCtx {
@@ -133,12 +132,11 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         }))
         .start()?;
 
-    let state_event = AfbEvent::new("state");
     let state_verb = AfbVerb::new("charging-state")
         .set_name("state")
         .set_info("current charging state")
         .set_action("['read','subscribe','unsubscribe']")?
-        .set_callback(Box::new(StateRequestCtrl {
+        .set_callback(Box::new(StateRequestCtx {
             mgr: manager,
             evt: state_event,
         }))
@@ -146,7 +144,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
 
     let subscribe = AfbVerb::new("subscribe-msg")
         .set_name("subscribe")
-        .set_callback(Box::new(SubscribeCtrl { event }))
+        .set_callback(Box::new(SubscribeCtx { event }))
         .set_info("subscribe charging events")
         .set_usage("true|false")
         .finalize()?;
@@ -172,6 +170,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     api.add_evt_handler(iec_handler);
     api.add_evt_handler(slac_handler);
     api.add_event(event);
+    api.add_verb(state_verb);
     api.add_verb(subscribe);
 
     Ok(())

@@ -53,7 +53,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     afb_log_msg!(Info, rootv4, "config:{}", jconf);
 
     // add binding custom converter
-    chmgr_register()?;
+    chmgr_registers()?;
     am62x_registers()?;
     slac_registers()?;
     engy_registers()?;
@@ -81,7 +81,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     let slac_api = to_static_str(jconf.get::<String>("slac_api")?);
     let auth_api = to_static_str(jconf.get::<String>("auth_api")?);
     let engy_api = to_static_str(jconf.get::<String>("energy_api")?);
-    let tic = to_static_str(jconf.get::<u32>("tic")?);
+    let tic = jconf.get::<u32>("tic")?;
     let config = BindingCfg {
         iec_api,
         slac_api,

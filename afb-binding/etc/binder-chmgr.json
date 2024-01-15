@@ -1,7 +1,12 @@
 {
-  "name": "afb-charging",
-  "no-ldpaths": true,
-  "alias": ["/devtools:/usr/share/afb-ui-devtools/binder"],
-  "monitoring": true,
-  "ws-client": ["unix:/tmp/api/engy"],
+    "name": "afb-charging",
+    "no-ldpaths": true,
+    "alias": [
+        "/devtools:/usr/share/afb-ui-devtools/binder"
+    ],
+    "monitoring": true,
+    "ws-client": [
+        "unix:/tmp/api/engy",
+        "unix:/tmp/api/auth"
+    ]
 }

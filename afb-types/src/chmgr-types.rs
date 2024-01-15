@@ -62,7 +62,7 @@ pub enum ChargingMsg {
     Plugged(PlugState),
     Power(PowerRequest),
     Iso(IsoState),
-    Auth(AuthState),
+    Auth(AuthMsg),
     State(ChargingState),
 }
 
@@ -73,11 +73,11 @@ pub struct ChargingState {
     #[serde(skip)]
     pub updated: bool,
     pub imax: u32,
+    pub pmax: u32,
     pub plugged: PlugState,
     pub power: PowerRequest,
     pub iso: IsoState,
-    pub auth: AuthState,
-    pub contract:String,
+    pub auth: AuthMsg,
 }
 
 impl ChargingState {
@@ -85,11 +85,11 @@ impl ChargingState {
         ChargingState {
             updated: false,
             imax: 0,
+            pmax:0,
             plugged: PlugState::Unknown,
             power: PowerRequest::Stop,
             iso: IsoState::Unset,
-            auth: AuthState::Idle,
-            contract: String::new(),
+            auth: AuthMsg::Idle,
         }
     }
 }

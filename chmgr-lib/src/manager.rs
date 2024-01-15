@@ -55,17 +55,23 @@ impl ManagerHandle {
                 let mut data_set = self.get_state()?;
 
                 afb_log_msg!(Notice, self.event, "Requesting nfc-auth");
-                data_set.auth = AuthState::Pending;
+                data_set.auth = AuthMsg::Pending;
                 self.event.push(ChargingMsg::Auth(data_set.auth));
                 // if auth check is ok then allow power
                 match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "nfc-auth", AFB_NO_DATA) {
                     Ok(response) => {
-                        data_set.auth = AuthState::Done;
+                        let contract= response.get::<&AuthState>(0)?;
+                        data_set.auth = contract.auth;
+                        if contract.imax < data_set.imax {
+                           data_set.imax=  contract.imax;
+                        }
+                        if contract.pmax < data_set.pmax {
+                           data_set.pmax=  contract.pmax;
+                        }
                         self.event.push(ChargingMsg::Auth(data_set.auth));
-                        data_set.contract= response.get::<JsoncObj>(0)?.index::<String>(0)?;
                     }
                     Err(_) => {
-                        data_set.auth = AuthState::Fail;
+                        data_set.auth = AuthMsg::Fail;
                         self.event.push(ChargingMsg::Auth(data_set.auth));
                        return afb_error!("charg-iec-auth", "fail to authenticate with NFC")
                     }
@@ -99,7 +105,7 @@ impl ManagerHandle {
                 // in current implementation overcurrent
                 afb_log_msg!(Warning, evt, "energy over-current stop charge");
                 AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
-                data_set.auth = AuthState::Idle;
+                data_set.auth = AuthMsg::Idle;
             }
 
             _ => {}
@@ -114,7 +120,7 @@ impl ManagerHandle {
         match msg {
             Iec6185Msg::PowerRqt(value) => {
                 data_set.imax = *value;
-                if let AuthState::Done = data_set.auth {
+                if let AuthMsg::Done = data_set.auth {
                     AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", true)?;
                 }
             }

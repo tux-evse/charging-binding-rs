@@ -110,6 +110,7 @@ pub fn chmgr_registers() -> Result<(), AfbError> {
     charging_state::register()?;
     error_state::register()?;
     power_request::register()?;
+    charging_event::register()?;
 
     Ok(())
 }

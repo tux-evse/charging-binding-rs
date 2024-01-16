@@ -1,5 +1,5 @@
 {
-    "name": "afb-charging",
+    "name": "afb-chmgr",
     "no-ldpaths": true,
     "alias": [
         "/devtools:/usr/share/afb-ui-devtools/binder"

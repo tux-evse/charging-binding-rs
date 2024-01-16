@@ -121,7 +121,15 @@ impl ManagerHandle {
             Iec6185Msg::PowerRqt(value) => {
                 data_set.imax = *value;
                 if let AuthMsg::Done = data_set.auth {
-                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", true)?;
+                    // vehicle start charging
+                    data_set.power= PowerRequest::Start;
+                    self.event.push(ChargingMsg::Power(PowerRequest::Charging));
+                } else {
+                    // vehicle stop charging
+                    let response= AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::READ)?;
+                    let data= response.get::<&MeterDataSet>(0)?;
+                    data_set.power= PowerRequest::Stop(data.total);
+                    self.event.push(ChargingMsg::Power(PowerRequest::Stop(data.total)));
                 }
             }
             Iec6185Msg::Error(_value) => {
@@ -130,7 +138,7 @@ impl ManagerHandle {
             Iec6185Msg::RelayOn(_value) => {}
             Iec6185Msg::Plugged(value) => {
                 if *value {
-                   AfbSubCall::call_sync(evt.get_api(), self.engy_api, "Energy-Session", EnergyAction::RESET)?;
+                   AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::RESET)?;
                 }
             }
         }

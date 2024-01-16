@@ -32,7 +32,8 @@ AfbDataConverter!(power_request, PowerRequest);
 #[serde(rename_all = "lowercase")]
 pub enum PowerRequest {
     Start,
-    Stop,
+    Charging,
+    Stop(i32),
 }
 
 AfbDataConverter!(plug_state, PlugState);
@@ -87,7 +88,7 @@ impl ChargingState {
             imax: 0,
             pmax:0,
             plugged: PlugState::Unknown,
-            power: PowerRequest::Stop,
+            power: PowerRequest::Stop(0),
             iso: IsoState::Unset,
             auth: AuthMsg::Idle,
         }

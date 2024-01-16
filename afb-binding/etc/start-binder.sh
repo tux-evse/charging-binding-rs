@@ -1,7 +1,7 @@
 #!/bin/bash
 
 export LD_LIBRARY_PATH=/usr/local/lib64
-pkill afb-slac
+pkill afb-chmgr
 cynagora-admin set '' 'HELLO' '' '*' yes
 clear
 
@@ -13,7 +13,7 @@ CONFDIR=`pwd`/etc
 DEVTOOL_PORT=1237
 echo Slac debug mode config=$CONFDIR/*.json port=$DEVTOOL_PORT
 
-afb-binder --name=afb-slac --port=$DEVTOOL_PORT -v \
+afb-binder --name=afb-chmgr --port=$DEVTOOL_PORT -v \
   --config=$CONFDIR/binder-chmgr.json \
   --config=$CONFDIR/binding-chmgr.json \
   --config=$CONFDIR/binding-slac.json \

@@ -6,7 +6,11 @@
     ],
     "monitoring": true,
     "ws-client": [
-        "unix:/tmp/api/engy",
-        "unix:/tmp/api/auth"
+        "private:unix:/tmp/api/engy",
+        "private:unix:/tmp/api/auth"
+    ],
+    "ws-server": [
+        "unix:/tmp/api/chmgr",
+        "tcp::12371/chmgr"
     ]
 }

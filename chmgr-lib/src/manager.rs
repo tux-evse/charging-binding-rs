@@ -57,6 +57,11 @@ impl ManagerHandle {
                 afb_log_msg!(Notice, self.event, "Requesting nfc-auth");
                 data_set.auth = AuthMsg::Pending;
                 self.event.push(ChargingMsg::Auth(data_set.auth));
+
+                // Fulup TBD clean wait 5s to simulate a user action
+                use std::{thread, time};
+                thread::sleep(time::Duration::from_millis(5000));
+
                 // if auth check is ok then allow power
                 match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "nfc-auth", AFB_NO_DATA) {
                     Ok(response) => {
@@ -76,6 +81,7 @@ impl ManagerHandle {
                        return afb_error!("charg-iec-auth", "fail to authenticate with NFC")
                     }
                 }
+
                 Ok(())
     }
 

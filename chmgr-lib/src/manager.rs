@@ -122,6 +122,8 @@ impl ManagerHandle {
                 data_set.imax = *value;
                 if let AuthMsg::Done = data_set.auth {
                     // vehicle start charging
+
+                    // Fulup TBD set maximum charge value from subscription, cable, limit, ...
                     data_set.power= PowerRequest::Start;
                     self.event.push(ChargingMsg::Power(PowerRequest::Charging));
                 } else {

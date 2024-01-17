@@ -24,6 +24,7 @@ pub struct BindingCfg {
     pub auth_api: &'static str,
     pub engy_api: &'static str,
     pub tic: u32,
+    pub limit: u32,
 }
 
 pub struct ApiUserData {
@@ -77,6 +78,12 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         ""
     };
 
+    let limit = if let Ok(value) = jconf.get::<u32>("climit") {
+        value
+    } else {
+        64
+    };
+
     let iec_api = to_static_str(jconf.get::<String>("iec_api")?);
     let slac_api = to_static_str(jconf.get::<String>("slac_api")?);
     let auth_api = to_static_str(jconf.get::<String>("auth_api")?);
@@ -88,6 +95,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         auth_api,
         engy_api,
         tic,
+        limit,
     };
 
     // create backend API
@@ -102,7 +110,6 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
             slac_api,
             engy_api,
         }));
-
 
     if let Ok(value) = jconf.get::<String>("permission") {
         api.set_permission(AfbPermission::new(to_static_str(value)));

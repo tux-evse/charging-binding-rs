@@ -79,7 +79,6 @@ impl ManagerHandle {
         let mut data_set = self.get_state()?;
         match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "nfc-auth", AFB_NO_DATA) {
             Ok(response) => {
-
                 let contract = response.get::<&AuthState>(0)?;
                 data_set.auth = contract.auth;
                 if contract.imax < data_set.imax {
@@ -148,20 +147,23 @@ impl ManagerHandle {
                 if *value < data_set.imax {
                     data_set.imax = *value;
                 }
-                if let AuthMsg::Done = data_set.auth {
-                    afb_log_msg!(
-                        Warning,
-                        evt,
-                        "authentication request accepted icable:{} imax:{}",
-                        value,
-                        data_set.imax
-                    );
+                match data_set.auth {
+                    AuthMsg::Done => {
+                        afb_log_msg!(
+                            Warning,
+                            evt,
+                            "power request accepted icable:{} imax:{}",
+                            value,
+                            data_set.imax
+                        );
 
-                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", data_set.imax)?;
-                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", true)?;
-                } else {
-                    afb_log_msg!(Warning, evt, "authentication fail power request refused");
-                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
+                        AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", data_set.imax)?;
+                        AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", true)?;
+                    }
+                    _ => {
+                        afb_log_msg!(Warning, evt, "power request refused auth:{:?}", data_set.auth);
+                        AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
+                    }
                 }
             }
             Iec6185Msg::Error(_value) => {

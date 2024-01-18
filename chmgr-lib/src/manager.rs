@@ -92,6 +92,7 @@ impl ManagerHandle {
             Err(_) => {
                 data_set.auth = AuthMsg::Fail;
                 self.event.push(ChargingMsg::Auth(data_set.auth));
+                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", false)?;
                 return afb_error!("charg-iec-auth", "fail to authenticate with NFC");
             }
         }
@@ -104,7 +105,10 @@ impl ManagerHandle {
 
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
         match msg {
-            SlacStatus::MATCHED => { /* start ISO15118 */ }
+            SlacStatus::MATCHED => {
+                 /* start ISO15118 */
+                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
+            }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
                 self.event.push(ChargingMsg::Iso(IsoState::Iec));
                 self.nfc_auth(evt)?;
@@ -142,28 +146,10 @@ impl ManagerHandle {
 
         match msg {
             Iec6185Msg::PowerRqt(value) => {
-                afb_log_msg!(Notice, self.event, "set eic power:true");
+                afb_log_msg!(Notice, self.event, "set eic power request:{}", value);
                 self.event.push(ChargingMsg::Plugged(PlugState::Lock));
                 if *value < data_set.imax {
                     data_set.imax = *value;
-                }
-                match data_set.auth {
-                    AuthMsg::Done => {
-                        afb_log_msg!(
-                            Warning,
-                            evt,
-                            "power request accepted icable:{} imax:{}",
-                            value,
-                            data_set.imax
-                        );
-
-                        AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", data_set.imax)?;
-                        AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", true)?;
-                    }
-                    _ => {
-                        afb_log_msg!(Warning, evt, "power request refused auth:{:?}", data_set.auth);
-                        AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
-                    }
                 }
             }
             Iec6185Msg::Error(_value) => {
@@ -198,7 +184,8 @@ impl ManagerHandle {
                         EnergyAction::RESET,
                     )?;
                 } else {
-                    AfbSubCall::call_sync(evt.get_api(), self.auth_api, "reset", AFB_NO_DATA)?;
+                    AfbSubCall::call_sync(evt.get_api(), self.auth_api, "reset-auth", AFB_NO_DATA)?;
+                    self.event.push(ChargingMsg::Power(PowerRequest::Idle));
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugOut));
                 }
             }

@@ -11,9 +11,8 @@
  */
 
 use afbv4::prelude::*;
-use std::cell::{RefCell, RefMut, Ref};
+use std::cell::{Ref, RefCell, RefMut};
 use typesv4::prelude::*;
-
 
 pub struct ManagerHandle {
     data_set: RefCell<ChargingState>,
@@ -24,7 +23,12 @@ pub struct ManagerHandle {
 }
 
 impl ManagerHandle {
-    pub fn new(auth_api: &'static str, iec_api: &'static str, engy_api: &'static str, event: &'static AfbEvent) -> &'static mut Self {
+    pub fn new(
+        auth_api: &'static str,
+        iec_api: &'static str,
+        engy_api: &'static str,
+        event: &'static AfbEvent,
+    ) -> &'static mut Self {
         let handle = ManagerHandle {
             auth_api,
             iec_api,
@@ -60,44 +64,43 @@ impl ManagerHandle {
     }
 
     fn nfc_auth(&self, evt: &AfbEventMsg) -> Result<(), AfbError> {
-                let mut data_set = self.get_state()?;
+        let mut data_set = self.get_state()?;
 
-                afb_log_msg!(Notice, self.event, "Requesting nfc-auth");
-                data_set.auth = AuthMsg::Pending;
-                self.event.push(ChargingMsg::Auth(data_set.auth));
+        afb_log_msg!(Notice, self.event, "Requesting nfc-auth");
+        data_set.auth = AuthMsg::Pending;
+        self.event.push(ChargingMsg::Auth(data_set.auth));
 
-                // Fulup TBD clean wait 5s to simulate a user action
-                use std::{thread, time};
-                thread::sleep(time::Duration::from_millis(5000));
+        // Fulup TBD clean wait 5s to simulate a user action
+        use std::{thread, time};
+        thread::sleep(time::Duration::from_millis(5000));
 
-                // if auth check is ok then allow power
-                match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "nfc-auth", AFB_NO_DATA) {
-                    Ok(response) => {
-                        let contract= response.get::<&AuthState>(0)?;
-                        data_set.auth = contract.auth;
-                        if contract.imax < data_set.imax {
-                           data_set.imax=  contract.imax;
-                        }
-                        if contract.pmax < data_set.pmax {
-                           data_set.pmax=  contract.pmax;
-                        }
-                        self.event.push(ChargingMsg::Auth(data_set.auth));
-                    }
-                    Err(_) => {
-                        data_set.auth = AuthMsg::Fail;
-                        self.event.push(ChargingMsg::Auth(data_set.auth));
-                       return afb_error!("charg-iec-auth", "fail to authenticate with NFC")
-                    }
+        // if auth check is ok then allow power
+        match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "nfc-auth", AFB_NO_DATA) {
+            Ok(response) => {
+                let contract = response.get::<&AuthState>(0)?;
+                data_set.auth = contract.auth;
+                if contract.imax < data_set.imax {
+                    data_set.imax = contract.imax;
                 }
+                if contract.pmax < data_set.pmax {
+                    data_set.pmax = contract.pmax;
+                }
+                self.event.push(ChargingMsg::Auth(data_set.auth));
+            }
+            Err(_) => {
+                data_set.auth = AuthMsg::Fail;
+                self.event.push(ChargingMsg::Auth(data_set.auth));
+                return afb_error!("charg-iec-auth", "fail to authenticate with NFC");
+            }
+        }
 
-                // force firmware imax/pwm
-                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
-                afb_log_msg!(Notice, self.event, "Valid nfc-auth");
-                Ok(())
+        // force firmware imax/pwm
+        AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
+        afb_log_msg!(Notice, self.event, "Valid nfc-auth");
+        Ok(())
     }
 
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
-
         match msg {
             SlacStatus::MATCHED => { /* start ISO15118 */ }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
@@ -138,19 +141,22 @@ impl ManagerHandle {
         match msg {
             Iec6185Msg::PowerRqt(value) => {
                 self.event.push(ChargingMsg::Plugged(PlugState::Lock));
-                data_set.imax = *value;
+                if *value < data_set.imax {
+                    data_set.imax = *value;
+                }
                 if let AuthMsg::Done = data_set.auth {
-                    // vehicle start charging
+                    afb_log_msg!(
+                        Warning,
+                        evt,
+                        "authentication request accepted icable:{} imax:{}",
+                        value, data_set.imax
+                    );
 
-                    // Fulup TBD set maximum charge value from subscription, cable, limit, ...
-                    data_set.power= PowerRequest::Start;
-                    self.event.push(ChargingMsg::Power(PowerRequest::Charging(data_set.imax)));
+                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", data_set.imax)?;
+                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", true)?;
                 } else {
-                    // vehicle stop charging
-                    let response= AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::READ)?;
-                    let data= response.get::<&MeterDataSet>(0)?;
-                    data_set.power= PowerRequest::Stop(data.total);
-                    self.event.push(ChargingMsg::Power(PowerRequest::Stop(data.total)));
+                    afb_log_msg!(Warning, evt, "authentication fail power request refused");
+                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
                 }
             }
             Iec6185Msg::Error(_value) => {
@@ -159,20 +165,31 @@ impl ManagerHandle {
             Iec6185Msg::RelayOn(value) => {
                 if *value {
                     // vehicle start charging
-                    self.event.push(ChargingMsg::Power(PowerRequest::Charging(data_set.imax)));
+                    self.event
+                        .push(ChargingMsg::Power(PowerRequest::Charging(data_set.imax)));
                 } else {
                     // vehicle stop charging
-                    let response= AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::READ)?;
-                    let data= response.get::<&MeterDataSet>(0)?;
-                    data_set.power= PowerRequest::Stop(data.total);
-                    self.event.push(ChargingMsg::Power(PowerRequest::Stop(data.total)));
+                    let response = AfbSubCall::call_sync(
+                        evt.get_api(),
+                        self.engy_api,
+                        "energy",
+                        EnergyAction::READ,
+                    )?;
+                    let data = response.get::<&MeterDataSet>(0)?;
+                    data_set.power = PowerRequest::Stop(data.total);
+                    self.event
+                        .push(ChargingMsg::Power(PowerRequest::Stop(data.total)));
                 }
-
             }
             Iec6185Msg::Plugged(value) => {
                 if *value {
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugIn));
-                   AfbSubCall::call_sync(evt.get_api(), self.iec_api, "energy", EnergyAction::RESET)?;
+                    AfbSubCall::call_sync(
+                        evt.get_api(),
+                        self.iec_api,
+                        "energy",
+                        EnergyAction::RESET,
+                    )?;
                 } else {
                     AfbSubCall::call_sync(evt.get_api(), self.auth_api, "reset", AFB_NO_DATA)?;
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugOut));

@@ -11,7 +11,7 @@
  */
 
 use afbv4::prelude::*;
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefCell, RefMut, Ref};
 use typesv4::prelude::*;
 
 
@@ -40,6 +40,14 @@ impl ManagerHandle {
     #[track_caller]
     pub fn get_state(&self) -> Result<RefMut<'_, ChargingState>, AfbError> {
         match self.data_set.try_borrow_mut() {
+            Err(_) => return afb_error!("charging-manager-update", "fail to access &mut data_set"),
+            Ok(value) => Ok(value),
+        }
+    }
+
+    #[track_caller]
+    pub fn check_state(&self) -> Result<Ref<'_, ChargingState>, AfbError> {
+        match self.data_set.try_borrow() {
             Err(_) => return afb_error!("charging-manager-update", "fail to access &mut data_set"),
             Ok(value) => Ok(value),
         }
@@ -84,7 +92,7 @@ impl ManagerHandle {
 
                 // force firmware imax/pwm
                 AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
-
+                afb_log_msg!(Notice, self.event, "Valid nfc-auth");
                 Ok(())
     }
 
@@ -98,6 +106,7 @@ impl ManagerHandle {
 
                 AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
                 self.event.push(ChargingMsg::Power(PowerRequest::Start));
+                afb_log_msg!(Notice, self.event, "set eic power:true");
             }
 
             _ => {}

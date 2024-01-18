@@ -114,7 +114,7 @@ struct TimerCtx {
 // send charging state every tic ms.
 AfbTimerRegister!(TimerCtrl, timer_callback, TimerCtx);
 fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Result<(), AfbError> {
-    let state= ctx.mgr.get_state()?;
+    let state= ctx.mgr.check_state()?;
     ctx.evt.push(state.clone());
     Ok(())
 }

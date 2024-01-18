@@ -135,7 +135,7 @@ impl ManagerHandle {
 
                     // Fulup TBD set maximum charge value from subscription, cable, limit, ...
                     data_set.power= PowerRequest::Start;
-                    self.event.push(ChargingMsg::Power(PowerRequest::Charging));
+                    self.event.push(ChargingMsg::Power(PowerRequest::Charging(data_set.imax)));
                 } else {
                     // vehicle stop charging
                     let response= AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::READ)?;
@@ -147,12 +147,25 @@ impl ManagerHandle {
             Iec6185Msg::Error(_value) => {
                 data_set.imax = 0;
             }
-            Iec6185Msg::RelayOn(_value) => {}
+            Iec6185Msg::RelayOn(value) => {
+                if *value {
+                    // vehicle start charging
+                    self.event.push(ChargingMsg::Power(PowerRequest::Charging(data_set.imax)));
+                } else {
+                    // vehicle stop charging
+                    let response= AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::READ)?;
+                    let data= response.get::<&MeterDataSet>(0)?;
+                    data_set.power= PowerRequest::Stop(data.total);
+                    self.event.push(ChargingMsg::Power(PowerRequest::Stop(data.total)));
+                }
+
+            }
             Iec6185Msg::Plugged(value) => {
                 if *value {
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugIn));
                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "energy", EnergyAction::RESET)?;
                 } else {
+                    AfbSubCall::call_sync(evt.get_api(), self.auth_api, "reset", AFB_NO_DATA)?;
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugOut));
                 }
             }

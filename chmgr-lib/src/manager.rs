@@ -98,7 +98,6 @@ impl ManagerHandle {
         }
 
         // force firmware imax/pwm
-        AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
         afb_log_msg!(Notice, self.event, "Valid nfc-auth");
         Ok(())
     }
@@ -146,7 +145,7 @@ impl ManagerHandle {
 
         match msg {
             Iec6185Msg::PowerRqt(value) => {
-                afb_log_msg!(Notice, self.event, "set eic power request:{}", value);
+                afb_log_msg!(Notice, self.event, "eic power-request imax:{}", value);
                 self.event.push(ChargingMsg::Plugged(PlugState::Lock));
                 if *value < data_set.imax {
                     data_set.imax = *value;
@@ -158,6 +157,7 @@ impl ManagerHandle {
             Iec6185Msg::RelayOn(value) => {
                 if *value {
                     // vehicle start charging
+                    AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
                     self.event
                         .push(ChargingMsg::Power(PowerRequest::Charging(data_set.imax)));
                 } else {

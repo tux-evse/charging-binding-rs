@@ -89,7 +89,6 @@ impl ManagerHandle {
     }
 
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
-        let data_set = self.get_state()?;
 
         match msg {
             SlacStatus::MATCHED => { /* start ISO15118 */ }
@@ -97,6 +96,7 @@ impl ManagerHandle {
                 self.event.push(ChargingMsg::Iso(IsoState::Iec));
                 self.nfc_auth(evt)?;
 
+                let data_set = self.get_state()?;
                 AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", data_set.imax)?;
                 self.event.push(ChargingMsg::Power(PowerRequest::Start));
             }
@@ -152,7 +152,7 @@ impl ManagerHandle {
             Iec6185Msg::Plugged(value) => {
                 if *value {
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugIn));
-                   AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::RESET)?;
+                   AfbSubCall::call_sync(evt.get_api(), self.iec_api, self., EnergyAction::RESET)?;
                 } else {
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugOut));
                 }

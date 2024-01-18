@@ -152,7 +152,7 @@ impl ManagerHandle {
             Iec6185Msg::Plugged(value) => {
                 if *value {
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugIn));
-                   AfbSubCall::call_sync(evt.get_api(), self.iec_api, self., EnergyAction::RESET)?;
+                   AfbSubCall::call_sync(evt.get_api(), self.iec_api, "energy", EnergyAction::RESET)?;
                 } else {
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugOut));
                 }

@@ -9,6 +9,7 @@ clear
 DIRNAME=`dirname $0`
 cd $DIRNAME/..
 CONFDIR=`pwd`/etc
+mkdir -p /tmp/api
 
 DEVTOOL_PORT=1237
 echo Slac debug mode config=$CONFDIR/*.json port=$DEVTOOL_PORT

@@ -96,8 +96,7 @@ impl ManagerHandle {
                 self.event.push(ChargingMsg::Iso(IsoState::Iec));
                 self.nfc_auth(evt)?;
 
-                let data_set = self.get_state()?;
-                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", data_set.imax)?;
+                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
                 self.event.push(ChargingMsg::Power(PowerRequest::Start));
             }
 

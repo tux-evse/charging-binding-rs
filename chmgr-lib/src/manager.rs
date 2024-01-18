@@ -64,19 +64,22 @@ impl ManagerHandle {
     }
 
     fn nfc_auth(&self, evt: &AfbEventMsg) -> Result<(), AfbError> {
-        let mut data_set = self.get_state()?;
-
-        afb_log_msg!(Notice, self.event, "Requesting nfc-auth");
-        data_set.auth = AuthMsg::Pending;
-        self.event.push(ChargingMsg::Auth(data_set.auth));
+        {
+            let mut data_set = self.get_state()?;
+            afb_log_msg!(Notice, self.event, "Requesting nfc-auth");
+            data_set.auth = AuthMsg::Pending;
+            self.event.push(ChargingMsg::Auth(data_set.auth));
+        }
 
         // Fulup TBD clean wait 5s to simulate a user action
         use std::{thread, time};
         thread::sleep(time::Duration::from_millis(5000));
 
         // if auth check is ok then allow power
+        let mut data_set = self.get_state()?;
         match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "nfc-auth", AFB_NO_DATA) {
             Ok(response) => {
+
                 let contract = response.get::<&AuthState>(0)?;
                 data_set.auth = contract.auth;
                 if contract.imax < data_set.imax {
@@ -140,6 +143,7 @@ impl ManagerHandle {
 
         match msg {
             Iec6185Msg::PowerRqt(value) => {
+                afb_log_msg!(Notice, self.event, "set eic power:true");
                 self.event.push(ChargingMsg::Plugged(PlugState::Lock));
                 if *value < data_set.imax {
                     data_set.imax = *value;
@@ -149,7 +153,8 @@ impl ManagerHandle {
                         Warning,
                         evt,
                         "authentication request accepted icable:{} imax:{}",
-                        value, data_set.imax
+                        value,
+                        data_set.imax
                     );
 
                     AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", data_set.imax)?;

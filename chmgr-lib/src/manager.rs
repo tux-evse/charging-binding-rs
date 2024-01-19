@@ -160,9 +160,6 @@ impl ManagerHandle {
                     value,
                     data_set.imax
                 );
-                if *value > 0 {
-                    self.event.push(ChargingMsg::Plugged(PlugState::Lock));
-                }
                 data_set.imax = *value;
             }
             Iec6185Msg::Error(_value) => {
@@ -193,7 +190,7 @@ impl ManagerHandle {
                 AfbSubCall::call_sync(evt.get_api(), self.auth_api, "reset-auth", AFB_NO_DATA)?;
                 AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::RESET)?;
                 if *value {
-                    self.event.push(ChargingMsg::Plugged(PlugState::PlugIn));
+                    self.event.push(ChargingMsg::Plugged(PlugState::Lock));
                 } else {
                     self.event.push(ChargingMsg::Power(PowerRequest::Idle));
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugOut));

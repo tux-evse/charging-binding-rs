@@ -160,7 +160,9 @@ impl ManagerHandle {
                     value,
                     data_set.imax
                 );
-                self.event.push(ChargingMsg::Plugged(PlugState::Lock));
+                if *value > 0 {
+                    self.event.push(ChargingMsg::Plugged(PlugState::Lock));
+                }
                 if *value < data_set.imax {
                     data_set.imax = *value;
                 }

@@ -163,9 +163,7 @@ impl ManagerHandle {
                 if *value > 0 {
                     self.event.push(ChargingMsg::Plugged(PlugState::Lock));
                 }
-                if *value < data_set.imax {
-                    data_set.imax = *value;
-                }
+                data_set.imax = *value;
             }
             Iec6185Msg::Error(_value) => {
                 data_set.imax = 0;

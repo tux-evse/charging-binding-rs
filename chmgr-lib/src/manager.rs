@@ -193,7 +193,7 @@ impl ManagerHandle {
             Iec6185Msg::Plugged(value) => {
                 // reset authentication and energy session values
                 AfbSubCall::call_sync(evt.get_api(), self.auth_api, "reset-auth", AFB_NO_DATA)?;
-                AfbSubCall::call_sync(evt.get_api(), self.iec_api, "energy", EnergyAction::RESET)?;
+                AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::RESET)?;
                 if *value {
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugIn));
                 } else {

@@ -81,12 +81,20 @@ impl ManagerHandle {
             Ok(response) => {
                 let contract = response.get::<&AuthState>(0)?;
                 data_set.auth = contract.auth;
-                if contract.imax < data_set.imax {
-                    data_set.imax = contract.imax;
-                }
-                if contract.pmax < data_set.pmax {
-                    data_set.pmax = contract.pmax;
-                }
+
+                let response = AfbSubCall::call_sync(
+                    evt.get_apiv4(),
+                    self.engy_api,
+                    "config",
+                    EngyConfSet {
+                        pmax: data_set.pmax as i32,
+                        imax: data_set.imax as i32,
+                    },
+                )?;
+
+                let engy_conf = response.get::<&EngyConfSet>(0)?;
+                data_set.imax = engy_conf.imax as u32;
+                data_set.pmax = engy_conf.pmax as u32;
                 self.event.push(ChargingMsg::Auth(data_set.auth));
             }
             Err(_) => {
@@ -105,7 +113,7 @@ impl ManagerHandle {
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
         match msg {
             SlacStatus::MATCHED => {
-                 /* start ISO15118 */
+                /* start ISO15118 */
                 AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
             }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
@@ -145,7 +153,13 @@ impl ManagerHandle {
 
         match msg {
             Iec6185Msg::PowerRqt(value) => {
-                afb_log_msg!(Notice, self.event, "eic power-request imax:{}", value);
+                afb_log_msg!(
+                    Notice,
+                    self.event,
+                    "eic power-request value:{} imax:{}",
+                    value,
+                    data_set.imax
+                );
                 self.event.push(ChargingMsg::Plugged(PlugState::Lock));
                 if *value < data_set.imax {
                     data_set.imax = *value;
@@ -175,16 +189,12 @@ impl ManagerHandle {
                 }
             }
             Iec6185Msg::Plugged(value) => {
+                // reset authentication and energy session values
+                AfbSubCall::call_sync(evt.get_api(), self.auth_api, "reset-auth", AFB_NO_DATA)?;
+                AfbSubCall::call_sync(evt.get_api(), self.iec_api, "energy", EnergyAction::RESET)?;
                 if *value {
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugIn));
-                    AfbSubCall::call_sync(
-                        evt.get_api(),
-                        self.iec_api,
-                        "energy",
-                        EnergyAction::RESET,
-                    )?;
                 } else {
-                    AfbSubCall::call_sync(evt.get_api(), self.auth_api, "reset-auth", AFB_NO_DATA)?;
                     self.event.push(ChargingMsg::Power(PowerRequest::Idle));
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugOut));
                 }

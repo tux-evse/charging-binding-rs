@@ -86,8 +86,8 @@ impl ChargingState {
     pub fn default() -> Self {
         ChargingState {
             updated: false,
-            imax: 0,
-            pmax:0,
+            imax: 32, // Fulup TBD should comme from energy mgr
+            pmax: 22,
             plugged: PlugState::Unknown,
             power: PowerRequest::Idle,
             iso: IsoState::Unset,

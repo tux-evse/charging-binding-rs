@@ -107,6 +107,23 @@ fn state_request_cb(
     Ok(())
 }
 
+
+struct ReserveChargerCtx {
+    mgr: &'static ManagerHandle,
+}
+AfbVerbRegister!(ReservechargerVerb, reserve_charger_cb, ReserveChargerCtx);
+fn reserve_charger_cb(
+    rqt: &AfbRequest,
+    args: &AfbData,
+    ctx: &mut ReserveChargerCtx,
+) -> Result<(), AfbError> {
+
+    let reservation= args.get::<&ReservationSession>(0)?;
+    let status= ctx.mgr.reserve (&reservation)?;
+    rqt.reply(status, 0);
+
+    Ok(())
+}
 struct TimerCtx {
     mgr: &'static ManagerHandle,
     evt: &'static AfbEvent,
@@ -143,7 +160,16 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         }))
         .finalize()?;
 
-    let subscribe = AfbVerb::new("subscribe-msg")
+    let reserve_verb = AfbVerb::new("reserve-charger")
+        .set_name("reserve")
+        .set_info("reserve charging station start/stop data")
+        .set_action("['now','delay','cancel']")?
+        .set_callback(Box::new(ReserveChargerCtx {
+            mgr: manager,
+        }))
+        .finalize()?;
+
+    let subscribe_verb = AfbVerb::new("subscribe-msg")
         .set_name("subscribe")
         .set_callback(Box::new(SubscribeCtx { event: msg_evt }))
         .set_info("subscribe charging events")
@@ -173,7 +199,8 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     api.add_event(msg_evt);
     api.add_event(state_event);
     api.add_verb(state_verb);
-    api.add_verb(subscribe);
+    api.add_verb(reserve_verb);
+    api.add_verb(subscribe_verb);
 
     Ok(())
 }

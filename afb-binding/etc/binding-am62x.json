@@ -7,7 +7,7 @@
             "info": "Ti MCU(am62x) firmware rpmsg/openamp API",
             "eptname": "rpmsg_tuxevse",
             "rport": 14,
-            "tic": 5000,
+            "tic": 60000,
             "lock_api": "i2c",
             "lock_verb": "gpio/lock-motor"
         }

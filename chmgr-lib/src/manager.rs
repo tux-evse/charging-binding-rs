@@ -57,6 +57,44 @@ impl ManagerHandle {
         }
     }
 
+    // Fulup TBD reservation is far more complex and should rely on backend interaction
+    pub fn reserve (&self, reservation: &ReservationSession) -> Result <ReservationStatus, AfbError> {
+        let mut data_set= self.get_state()?;
+        let response= match &data_set.reservation {
+            None => {
+                match reservation.status {
+                    ReservationStatus::Request => {
+                        let resa= ReservationState {
+                            id: reservation.id,
+                            start: reservation.start,
+                            stop: reservation.stop,
+                        };
+                         data_set.reservation= Some(resa);
+                        ReservationStatus::Accepted
+                    }
+                    _ => { return afb_error!("reservation-not-present", "current request:{:?}", reservation.status)}
+
+                }
+            }
+            Some(value) =>  match reservation.status {
+                ReservationStatus::Cancel => {
+
+                    if value.id != reservation.id {
+                        return afb_error!("reservation-invalid-id", "current session:{} request:{}", value.id, reservation.id)
+                    }
+                    data_set.reservation= None;
+                    ReservationStatus::Cancel
+                },
+                _ => {
+                    return afb_error!("reservation-already-running", "current session:{} request:{:?}",value.id, reservation.status)
+                }
+            }
+        };
+
+        self.event.push(ChargingMsg::Reservation(response));
+        Ok(response)
+    }
+
     pub fn push_state(&self) -> Result<(), AfbError> {
         let data_set = self.get_state()?;
         self.event.push(data_set.clone());
@@ -156,11 +194,17 @@ impl ManagerHandle {
                 afb_log_msg!(
                     Notice,
                     self.event,
-                    "eic power-request value:{} imax:{}",
+                    "eic power-request value:{}", value);
+            }
+            Iec6185Msg::CableImax(value) => {
+                afb_log_msg!(
+                    Notice,
+                    self.event,
+                    "eic cable-imax new:{} old:{}",
                     value,
                     data_set.imax
                 );
-                data_set.imax = *value;
+                data_set.imax=*value;
             }
             Iec6185Msg::Error(_value) => {
                 data_set.imax = 0;

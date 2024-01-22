@@ -17,13 +17,14 @@ AfbDataConverter!(iec6185_msg, Iec6185Msg);
 #[serde(rename_all = "lowercase")]
 pub enum Iec6185Msg {
     Plugged(bool),
-    PowerRqt(u32),
+    PowerRqt(bool),
+    CableImax(u32),
     RelayOn(bool),
     Error(String),
 }
 
-pub fn am62x_registers() -> Result <(), AfbError> {
 
+pub fn am62x_registers() -> Result <(), AfbError> {
     // add binding custom converter
     iec6185_msg::register()?;
     Ok(())

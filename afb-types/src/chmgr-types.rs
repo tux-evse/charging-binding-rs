@@ -13,6 +13,7 @@
 use crate::prelude::*;
 use afbv4::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 AfbDataConverter!(error_state, ErrorState);
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -66,6 +67,16 @@ pub enum ChargingMsg {
     Iso(IsoState),
     Auth(AuthMsg),
     State(ChargingState),
+    Reservation(ReservationStatus)
+}
+
+AfbDataConverter!(reservation_state, ReservationState);
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "lowercase")]
+pub struct ReservationState {
+    pub id: i64,
+    pub start: Duration,
+    pub stop: Duration,
 }
 
 AfbDataConverter!(charging_state, ChargingState);
@@ -74,12 +85,15 @@ AfbDataConverter!(charging_state, ChargingState);
 pub struct ChargingState {
     #[serde(skip)]
     pub updated: bool,
+    #[serde(skip)]
+    pub reservation: Option<ReservationState>,
     pub imax: u32,
     pub pmax: u32,
     pub plugged: PlugState,
     pub power: PowerRequest,
     pub iso: IsoState,
     pub auth: AuthMsg,
+
 }
 
 impl ChargingState {
@@ -92,6 +106,7 @@ impl ChargingState {
             power: PowerRequest::Idle,
             iso: IsoState::Unset,
             auth: AuthMsg::Idle,
+            reservation: None,
         }
     }
 }
@@ -105,6 +120,33 @@ pub enum ChargingAction {
     SUBSCRIBE,
     UNSUBSCRIBE,
 }
+pub enum ReservationAction {
+    NOW,
+    DELAY,
+    CANCEL,
+}
+
+AfbDataConverter!(charging_msg, ReservationStatus);
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum ReservationStatus {
+    Accepted,
+    Refused,
+    Pending,
+    Cancel,
+    Request,
+}
+
+AfbDataConverter!(reservation_session, ReservationSession);
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "lowercase")]
+pub struct ReservationSession {
+    pub id: i64,
+    pub tagid:String,
+    pub start: Duration,
+    pub stop:  Duration,
+    pub status: ReservationStatus,
+}
 
 pub fn chmgr_registers() -> Result<(), AfbError> {
     charging_actions::register()?;
@@ -113,6 +155,8 @@ pub fn chmgr_registers() -> Result<(), AfbError> {
     error_state::register()?;
     power_request::register()?;
     charging_event::register()?;
+    reservation_session::register()?;
+    reservation_state::register()?;
 
     Ok(())
 }

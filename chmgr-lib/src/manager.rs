@@ -58,37 +58,49 @@ impl ManagerHandle {
     }
 
     // Fulup TBD reservation is far more complex and should rely on backend interaction
-    pub fn reserve (&self, reservation: &ReservationSession) -> Result <ReservationStatus, AfbError> {
-        let mut data_set= self.get_state()?;
-        let response= match &data_set.reservation {
-            None => {
-                match reservation.status {
-                    ReservationStatus::Request => {
-                        let resa= ReservationState {
-                            id: reservation.id,
-                            start: reservation.start,
-                            stop: reservation.stop,
-                        };
-                         data_set.reservation= Some(resa);
-                        ReservationStatus::Accepted
-                    }
-                    _ => { return afb_error!("reservation-not-present", "current request:{:?}", reservation.status)}
-
+    pub fn reserve(&self, reservation: &ReservationSession) -> Result<ReservationStatus, AfbError> {
+        let mut data_set = self.get_state()?;
+        let response = match &data_set.reservation {
+            None => match reservation.status {
+                ReservationStatus::Request => {
+                    let resa = ReservationState {
+                        id: reservation.id,
+                        start: reservation.start,
+                        stop: reservation.stop,
+                    };
+                    data_set.reservation = Some(resa);
+                    ReservationStatus::Accepted
                 }
-            }
-            Some(value) =>  match reservation.status {
-                ReservationStatus::Cancel => {
-
-                    if value.id != reservation.id {
-                        return afb_error!("reservation-invalid-id", "current session:{} request:{}", value.id, reservation.id)
-                    }
-                    data_set.reservation= None;
-                    ReservationStatus::Cancel
-                },
                 _ => {
-                    return afb_error!("reservation-already-running", "current session:{} request:{:?}",value.id, reservation.status)
+                    return afb_error!(
+                        "reservation-not-present",
+                        "current request:{:?}",
+                        reservation.status
+                    )
                 }
-            }
+            },
+            Some(value) => match reservation.status {
+                ReservationStatus::Cancel => {
+                    if value.id != reservation.id {
+                        return afb_error!(
+                            "reservation-invalid-id",
+                            "current session:{} request:{}",
+                            value.id,
+                            reservation.id
+                        );
+                    }
+                    data_set.reservation = None;
+                    ReservationStatus::Cancel
+                }
+                _ => {
+                    return afb_error!(
+                        "reservation-already-running",
+                        "current session:{} request:{:?}",
+                        value.id,
+                        reservation.status
+                    )
+                }
+            },
         };
 
         self.event.push(ChargingMsg::Reservation(response));
@@ -101,7 +113,7 @@ impl ManagerHandle {
         Ok(())
     }
 
-    fn nfc_auth(&self, evt: &AfbEventMsg) -> Result<(), AfbError> {
+    fn auth_rqt(&self, evt: &AfbEventMsg) -> Result<(), AfbError> {
         {
             let mut data_set = self.get_state()?;
             afb_log_msg!(Notice, self.event, "Requesting nfc-auth");
@@ -115,7 +127,7 @@ impl ManagerHandle {
 
         // if auth check is ok then allow power
         let mut data_set = self.get_state()?;
-        match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "nfc-auth", AFB_NO_DATA) {
+        match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "login", AFB_NO_DATA) {
             Ok(response) => {
                 let contract = response.get::<&AuthState>(0)?;
                 data_set.auth = contract.auth;
@@ -137,7 +149,6 @@ impl ManagerHandle {
 
                 // set imax configuration
                 AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
-
             }
             Err(_) => {
                 data_set.auth = AuthMsg::Fail;
@@ -159,7 +170,7 @@ impl ManagerHandle {
             }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
                 self.event.push(ChargingMsg::Iso(IsoState::Iec));
-                self.nfc_auth(evt)?;
+                self.auth_rqt(evt)?;
 
                 AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
                 self.event.push(ChargingMsg::Power(PowerRequest::Start));
@@ -194,10 +205,7 @@ impl ManagerHandle {
 
         match msg {
             Iec6185Msg::PowerRqt(value) => {
-                afb_log_msg!(
-                    Notice,
-                    self.event,
-                    "eic power-request value:{}", value);
+                afb_log_msg!(Notice, self.event, "eic power-request value:{}", value);
             }
             Iec6185Msg::CableImax(value) => {
                 afb_log_msg!(
@@ -207,7 +215,7 @@ impl ManagerHandle {
                     value,
                     data_set.imax
                 );
-                data_set.imax=*value;
+                data_set.imax = *value;
             }
             Iec6185Msg::Error(_value) => {
                 data_set.imax = 0;
@@ -234,11 +242,19 @@ impl ManagerHandle {
             }
             Iec6185Msg::Plugged(value) => {
                 // reset authentication and energy session values
-                AfbSubCall::call_sync(evt.get_api(), self.auth_api, "reset-auth", AFB_NO_DATA)?;
-                AfbSubCall::call_sync(evt.get_api(), self.engy_api, "energy", EnergyAction::RESET)?;
+                let response = AfbSubCall::call_sync(
+                    evt.get_api(),
+                    self.engy_api,
+                    "energy",
+                    EnergyAction::RESET,
+                )?;
+                let data = response.get::<&MeterDataSet>(0)?;
+
                 if *value {
                     self.event.push(ChargingMsg::Plugged(PlugState::Lock));
                 } else {
+                    // notify idp manager that session is closed
+                    AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
                     self.event.push(ChargingMsg::Power(PowerRequest::Idle));
                     self.event.push(ChargingMsg::Plugged(PlugState::PlugOut));
                 }

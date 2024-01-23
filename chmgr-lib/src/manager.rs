@@ -134,6 +134,10 @@ impl ManagerHandle {
                 data_set.imax = engy_conf.imax as u32;
                 data_set.pmax = engy_conf.pmax as u32;
                 self.event.push(ChargingMsg::Auth(data_set.auth));
+
+                // set imax configuration
+                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
+
             }
             Err(_) => {
                 data_set.auth = AuthMsg::Fail;
@@ -143,7 +147,6 @@ impl ManagerHandle {
             }
         }
 
-        // force firmware imax/pwm
         afb_log_msg!(Notice, self.event, "Valid nfc-auth");
         Ok(())
     }
@@ -151,7 +154,7 @@ impl ManagerHandle {
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
         match msg {
             SlacStatus::MATCHED => {
-                /* start ISO15118 */
+                /* start ISO15118 Fulup TBD should set imax */
                 AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
             }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {

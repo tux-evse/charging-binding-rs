@@ -54,6 +54,7 @@ pub enum PlugState {
 pub enum IsoState {
     Iso20,
     Iso2,
+    Iso3,
     Iec,
     Unset,
 }

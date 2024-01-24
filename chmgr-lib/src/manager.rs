@@ -114,19 +114,12 @@ impl ManagerHandle {
     }
 
     fn auth_rqt(&self, evt: &AfbEventMsg) -> Result<(), AfbError> {
-        {
-            let mut data_set = self.get_state()?;
-            afb_log_msg!(Notice, self.event, "Requesting nfc-auth");
-            data_set.auth = AuthMsg::Pending;
-            self.event.push(ChargingMsg::Auth(data_set.auth));
-        }
-
-        // Fulup TBD clean wait 5s to simulate a user action
-        use std::{thread, time};
-        thread::sleep(time::Duration::from_millis(5000));
-
-        // if auth check is ok then allow power
         let mut data_set = self.get_state()?;
+
+        afb_log_msg!(Notice, self.event, "Requesting idp-login");
+        data_set.auth = AuthMsg::Pending;
+        self.event.push(ChargingMsg::Auth(data_set.auth));
+
         match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "login", AFB_NO_DATA) {
             Ok(response) => {
                 let contract = response.get::<&AuthState>(0)?;
@@ -154,32 +147,40 @@ impl ManagerHandle {
                 data_set.auth = AuthMsg::Fail;
                 self.event.push(ChargingMsg::Auth(data_set.auth));
                 AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", false)?;
-                return afb_error!("charg-iec-auth", "fail to authenticate with NFC");
+                return afb_error!("charg-iec-auth", "fail idp authentication");
             }
         }
 
-        afb_log_msg!(Notice, self.event, "Valid nfc-auth");
+        data_set.auth = AuthMsg::Done;
+        afb_log_msg!(Notice, self.event, "Valid idp-auth");
         Ok(())
     }
 
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
-        match msg {
+        let iso_state= match msg {
             SlacStatus::MATCHED => {
                 /* start ISO15118 Fulup TBD should set imax */
-                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
+                IsoState::Iso3
+
             }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
-                self.event.push(ChargingMsg::Iso(IsoState::Iec));
-                self.auth_rqt(evt)?;
-
-                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
-                self.event.push(ChargingMsg::Power(PowerRequest::Start));
-                afb_log_msg!(Notice, self.event, "set eic power:true");
+                self.auth_rqt(evt)?; // Warning lock data_set
+                IsoState::Iec
             }
 
-            _ => {}
-        }
+            _ => {
+                return Ok(()); /* silently ignore any other messages */
+            }
+        };
 
+        // lock data_set only after self.auth_rqt released it
+        let mut data_set = self.get_state()?;
+        data_set.iso = iso_state;
+
+        AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
+        self.event.push(ChargingMsg::Iso(data_set.iso));
+        self.event.push(ChargingMsg::Power(PowerRequest::Start));
+        afb_log_msg!(Notice, self.event, "Slac|Auth done allow power");
         Ok(())
     }
 
@@ -188,15 +189,13 @@ impl ManagerHandle {
 
         match msg.tag {
             MeterTagSet::OverCurrent => {
-                // in current implementation overcurrent
+                // in current implementation over-current
                 afb_log_msg!(Warning, evt, "energy over-current stop charge");
                 AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
-                data_set.auth = AuthMsg::Idle;
+                data_set.power = PowerRequest::Idle;
             }
-
             _ => {}
         }
-
         Ok(())
     }
 
@@ -206,6 +205,7 @@ impl ManagerHandle {
         match msg {
             Iec6185Msg::PowerRqt(value) => {
                 afb_log_msg!(Notice, self.event, "eic power-request value:{}", value);
+                data_set.power = PowerRequest::Start;
             }
             Iec6185Msg::CableImax(value) => {
                 afb_log_msg!(
@@ -223,9 +223,8 @@ impl ManagerHandle {
             Iec6185Msg::RelayOn(value) => {
                 if *value {
                     // vehicle start charging
+                    data_set.power = PowerRequest::Charging(data_set.imax);
                     AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
-                    self.event
-                        .push(ChargingMsg::Power(PowerRequest::Charging(data_set.imax)));
                 } else {
                     // vehicle stop charging
                     let response = AfbSubCall::call_sync(
@@ -236,9 +235,8 @@ impl ManagerHandle {
                     )?;
                     let data = response.get::<&MeterDataSet>(0)?;
                     data_set.power = PowerRequest::Stop(data.total);
-                    self.event
-                        .push(ChargingMsg::Power(PowerRequest::Stop(data.total)));
                 }
+                self.event.push(ChargingMsg::Power(data_set.power));
             }
             Iec6185Msg::Plugged(value) => {
                 // reset authentication and energy session values
@@ -251,13 +249,15 @@ impl ManagerHandle {
                 let data = response.get::<&MeterDataSet>(0)?;
 
                 if *value {
-                    self.event.push(ChargingMsg::Plugged(PlugState::Lock));
+                    data_set.plugged = PlugState::Lock;
                 } else {
                     // notify idp manager that session is closed
                     AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
-                    self.event.push(ChargingMsg::Power(PowerRequest::Idle));
-                    self.event.push(ChargingMsg::Plugged(PlugState::PlugOut));
+                    data_set.plugged = PlugState::PlugOut;
+                    data_set.power = PowerRequest::Idle;
+                    self.event.push(ChargingMsg::Power(data_set.power));
                 }
+                self.event.push(ChargingMsg::Plugged(data_set.plugged));
             }
         }
         Ok(())

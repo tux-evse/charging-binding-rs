@@ -52,7 +52,7 @@ impl ManagerHandle {
     #[track_caller]
     pub fn check_state(&self) -> Result<Ref<'_, ChargingState>, AfbError> {
         match self.data_set.try_borrow() {
-            Err(_) => return afb_error!("charging-manager-update", "fail to access &mut data_set"),
+            Err(_) => return afb_error!("charging-manager-state", "fail to access &data_set"),
             Ok(value) => Ok(value),
         }
     }

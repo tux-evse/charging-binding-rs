@@ -115,6 +115,10 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         api.set_permission(AfbPermission::new(to_static_str(value)));
     };
 
+    if let Ok(value) = jconf.get::<i32>("verbosity") {
+        api.set_verbosity(value);
+    };
+
     register_verbs(api, config)?;
     Ok(api.finalize()?)
 }

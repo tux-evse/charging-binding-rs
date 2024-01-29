@@ -75,7 +75,7 @@ AfbDataConverter!(reservation_state, ReservationState);
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub struct ReservationState {
-    pub id: i64,
+    pub id: i32,
     pub start: Duration,
     pub stop: Duration,
 }

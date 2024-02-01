@@ -14,10 +14,6 @@ use crate::prelude::*;
 use afbv4::prelude::*;
 use typesv4::prelude::*;
 
-pub(crate) fn to_static_str(value: String) -> &'static str {
-    Box::leak(value.into_boxed_str())
-}
-
 pub struct BindingCfg {
     pub iec_api: &'static str,
     pub slac_api: &'static str,

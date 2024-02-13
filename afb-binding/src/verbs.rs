@@ -125,27 +125,19 @@ fn reserve_charger_cb(
     Ok(())
 }
 
-struct PowerData {
+struct RemotePowerData {
+    mgr: &'static ManagerHandle,
 }
 
-AfbVerbRegister!(PowerCtrl, power_callback, PowerData);
-fn power_callback(
+AfbVerbRegister!(RemotePowerCtrl, remote_power_callback, RemotePowerData);
+fn remote_power_callback(
     request: &AfbRequest,
     args: &AfbData,
-    ctx: &mut PowerData,
+    ctx: &mut RemotePowerData,
 ) -> Result<(), AfbError> {
     let enable = args.get::<bool>(0)?;
-    if enable {
-        afb_log_msg!(Debug, None, "verb power_dev triggered, enable");
-    }
 
-    else {
-        afb_log_msg!(Debug, None, "verb power_dev triggered, disable");
-    }
-    // let msg = if enable { &ctx.enable } else { &ctx.disable };
-    // if let Err(error) = ctx.dev.write(msg) {
-    //     return afb_error!("m4-rpc-fail", "power({}):{}", enable, error);
-    // };
+    ctx.mgr.power(enable)?;
 
     request.reply(AFB_NO_DATA, 0);
     Ok(())
@@ -163,9 +155,9 @@ fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Resul
     Ok(())
 }
 
-pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
+pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
     let msg_evt = AfbEvent::new("msg");
-    let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api, msg_evt);
+    let manager = ManagerHandle::new(apiv4,config.auth_api, config.iec_api, config.engy_api, msg_evt);
 
     let state_event = AfbEvent::new("state");
     AfbTimer::new("tic-timer")
@@ -220,12 +212,10 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         .set_callback(Box::new(EngyEvtCtx {mgr: manager }))
         .finalize()?;
 
-    let ctx = PowerCtrl {
-//        dev: handle.clone(),
-//        enable: mk_power(true)?,
-//        disable: mk_power(false)?,
+    let ctx = RemotePowerData {
+        mgr: manager,
     };
-    let allow_power_dev = AfbVerb::new("power_dev")
+    let remote_power_verb = AfbVerb::new("remote_power")
         .set_callback(Box::new(ctx))
         .set_info("allow power (true/false)")
         .set_usage("true/false")
@@ -238,9 +228,9 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     api.add_event(state_event);
     api.add_verb(state_verb);
     api.add_verb(reserve_verb);
-    api.add_verb(subscribe_verb);
+    api.add_verb(subscribe_verb);   
 
-    api.add_verb(allow_power_dev);
+    api.add_verb(remote_power_verb);
 
     Ok(())
 }

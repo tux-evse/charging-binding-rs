@@ -152,6 +152,33 @@ fn reserve_charger_cb(
 
     Ok(())
 }
+
+struct PowerData {
+}
+
+AfbVerbRegister!(PowerCtrl, power_callback, PowerData);
+fn power_callback(
+    request: &AfbRequest,
+    args: &AfbData,
+    ctx: &mut PowerData,
+) -> Result<(), AfbError> {
+    let enable = args.get::<bool>(0)?;
+    if enable {
+        afb_log_msg!(Debug, None, "verb power_dev triggered, enable");
+    }
+
+    else {
+        afb_log_msg!(Debug, None, "verb power_dev triggered, disable");
+    }
+    // let msg = if enable { &ctx.enable } else { &ctx.disable };
+    // if let Err(error) = ctx.dev.write(msg) {
+    //     return afb_error!("m4-rpc-fail", "power({}):{}", enable, error);
+    // };
+
+    request.reply(AFB_NO_DATA, 0);
+    Ok(())
+}
+
 struct TimerCtx {
     mgr: &'static ManagerHandle,
     evt: &'static AfbEvent,
@@ -164,9 +191,9 @@ fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Resul
     Ok(())
 }
 
-pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
+pub(crate) fn register_verbs(apiv4: AfbApiV4, api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
     let msg_evt = AfbEvent::new("msg");
-    let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api, msg_evt);
+    let manager = ManagerHandle::new(apiv4,config.auth_api, config.iec_api, config.engy_api, msg_evt);
 
     let state_event = AfbEvent::new("state");
     AfbTimer::new("tic-timer")
@@ -234,6 +261,17 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         .finalize()?;
 
 
+    let ctx = PowerCtrl {
+//        dev: handle.clone(),
+//        enable: mk_power(true)?,
+//        disable: mk_power(false)?,
+    };
+    let allow_power_dev = AfbVerb::new("power_dev")
+        .set_callback(Box::new(ctx))
+        .set_info("allow power (true/false)")
+        .set_usage("true/false")
+        .finalize()?;
+
     api.add_evt_handler(iover_handler);
     api.add_evt_handler(iavail_handler);
     api.add_evt_handler(iec_handler);
@@ -244,6 +282,8 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     api.add_verb(state_verb);
     api.add_verb(reserve_verb);
     api.add_verb(subscribe_verb);
+
+    api.add_verb(allow_power_dev);
 
     Ok(())
 }

@@ -15,6 +15,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use typesv4::prelude::*;
 
 pub struct ManagerHandle {
+    apiv4: AfbApiV4,
     data_set: RefCell<ChargingState>,
     auth_api: &'static str,
     iec_api: &'static str,
@@ -24,12 +25,14 @@ pub struct ManagerHandle {
 
 impl ManagerHandle {
     pub fn new(
+        apiv4: AfbApiV4,
         auth_api: &'static str,
         iec_api: &'static str,
         engy_api: &'static str,
         event: &'static AfbEvent,
     ) -> &'static mut Self {
         let handle = ManagerHandle {
+            apiv4,
             auth_api,
             iec_api,
             engy_api,

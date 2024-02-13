@@ -237,13 +237,13 @@ pub fn power(&self, allow: bool) -> Result<(), AfbError> {
     let mut data_set = self.get_state()?;
 
     if allow {
-        afb_log_msg!(Notice, None, "function remote power triggered, allow");
+        afb_log_msg!(Notice, None, "function remote power triggered, allow power");
         AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", true)?;
         data_set.power = PowerRequest::Idle;
     }
     else {
-        afb_log_msg!(Notice, None, "function remote power triggered, allow");
-        AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", true)?;
+        afb_log_msg!(Notice, None, "function remote power triggered, stop power");
+        AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", false)?;
         data_set.power = PowerRequest::Idle;
     }
 

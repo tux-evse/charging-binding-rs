@@ -214,7 +214,7 @@ impl ManagerHandle {
         Ok(())
     }
 
-    pub fn engy(&self, evt: &AfbEventMsg, msg: &MeterDataSet) -> Result<(), AfbError> {
+    pub fn engy_iover(&self, evt: &AfbEventMsg, msg: &MeterDataSet) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
 
         match msg.tag {
@@ -225,6 +225,18 @@ impl ManagerHandle {
                 data_set.power = PowerRequest::Idle;
             }
             _ => {}
+        }
+        Ok(())
+    }
+
+    pub fn engy_imax(&self, evt: &AfbEventMsg, imax: u32) -> Result<(), AfbError> {
+        let data_set = self.get_state()?;
+
+        if let PowerRequest::Charging(current) = data_set.power {
+            if current > imax {
+                AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", imax)?;
+                self.event.push(ChargingMsg::Power(PowerRequest::Charging(imax)));
+            }
         }
         Ok(())
     }

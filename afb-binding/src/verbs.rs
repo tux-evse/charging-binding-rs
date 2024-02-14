@@ -29,16 +29,30 @@ fn ocpp_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut OcppEvtCtx) -> Res
     Ok(())
 }
 
-struct EngyEvtCtx {
+struct EngyIoverCtx {
     mgr: &'static ManagerHandle,
 }
-AfbEventRegister!(EngyEvtCtrl, engy_event_cb, EngyEvtCtx);
-fn engy_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut EngyEvtCtx) -> Result<(), AfbError> {
+AfbEventRegister!(EngyIoverCtrl, engy_iover_cb, EngyIoverCtx);
+fn engy_iover_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut EngyIoverCtx) -> Result<(), AfbError> {
     let msg = args.get::<&MeterDataSet>(0)?;
 
     // forward engy events to potential listeners
-    afb_log_msg!(Debug, evt, "engy_evt:{:?}", msg);
-    ctx.mgr.engy(evt, msg)?;
+    afb_log_msg!(Debug, evt, "engy_iover:{:?}", msg);
+    ctx.mgr.engy_iover(evt, msg)?;
+
+    Ok(())
+}
+
+struct EngyIavailCtx {
+    mgr: &'static ManagerHandle,
+}
+AfbEventRegister!(EngyIavailCtrl, engy_iavail_cb, EngyIavailCtx);
+fn engy_iavail_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut EngyIavailCtx) -> Result<(), AfbError> {
+    let msg = args.get::<u32>(0)?;
+
+    // forward engy events to potential listeners
+    afb_log_msg!(Debug, evt, "engy_iavail:{:?}", msg);
+    ctx.mgr.engy_imax(evt, msg)?;
 
     Ok(())
 }
@@ -209,12 +223,19 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         .set_callback(Box::new(SlacEvtCtx { mgr: manager }))
         .finalize()?;
 
-    let engy_handler = AfbEvtHandler::new("engy-evt")
-        .set_pattern(to_static_str(format!("{}/*", config.engy_api)))
-        .set_callback(Box::new(EngyEvtCtx {mgr: manager }))
+    let iover_handler = AfbEvtHandler::new("iover-evt")
+        .set_pattern(to_static_str(format!("{}/iover", config.engy_api)))
+        .set_callback(Box::new(EngyIoverCtx {mgr: manager }))
         .finalize()?;
 
-    api.add_evt_handler(engy_handler);
+    let iavail_handler = AfbEvtHandler::new("iavail-evt")
+        .set_pattern(to_static_str(format!("{}/iavail", config.engy_api)))
+        .set_callback(Box::new(EngyIavailCtx {mgr: manager }))
+        .finalize()?;
+
+
+    api.add_evt_handler(iover_handler);
+    api.add_evt_handler(iavail_handler);
     api.add_evt_handler(iec_handler);
     api.add_evt_handler(slac_handler);
     api.add_evt_handler(ocpp_handler);

@@ -19,6 +19,7 @@ pub struct BindingCfg {
     pub slac_api: &'static str,
     pub auth_api: &'static str,
     pub engy_api: &'static str,
+    pub ocpp_api: &'static str,
     pub tic: u32,
     pub limit: u32,
 }
@@ -50,6 +51,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     afb_log_msg!(Info, rootv4, "config:{}", jconf);
 
     // add binding custom converter
+    ocpp_registers()?;
     chmgr_registers()?;
     am62x_registers()?;
     slac_registers()?;
@@ -84,12 +86,14 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     let slac_api = to_static_str(jconf.get::<String>("slac_api")?);
     let auth_api = to_static_str(jconf.get::<String>("auth_api")?);
     let engy_api = to_static_str(jconf.get::<String>("energy_api")?);
+    let ocpp_api = to_static_str(jconf.get::<String>("ocpp_api")?);
     let tic = jconf.get::<u32>("tic")?;
     let config = BindingCfg {
         iec_api,
         slac_api,
         auth_api,
         engy_api,
+        ocpp_api,
         tic,
         limit,
     };
@@ -101,6 +105,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         .require_api(slac_api)
         .require_api(engy_api)
         .require_api(auth_api)
+        .require_api(ocpp_api)
         .set_callback(Box::new(ApiUserData {
             iec_api,
             slac_api,

@@ -157,11 +157,10 @@ impl ManagerHandle {
     }
 
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
-        let iso_state= match msg {
+        let iso_state = match msg {
             SlacStatus::MATCHED => {
                 /* start ISO15118 Fulup TBD should set imax */
                 IsoState::Iso3
-
             }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
                 self.auth_rqt(evt)?; // Warning lock data_set
@@ -181,6 +180,37 @@ impl ManagerHandle {
         self.event.push(ChargingMsg::Iso(data_set.iso));
         self.event.push(ChargingMsg::Power(PowerRequest::Start));
         afb_log_msg!(Notice, self.event, "Slac|Auth done allow power");
+        Ok(())
+    }
+
+    pub fn ocpp(&self, evt: &AfbEventMsg, msg: &OcppMsg) -> Result<(), AfbError> {
+        let data_set = self.get_state()?;
+
+        match msg {
+            OcppMsg::PowerLimit(limit) => {
+                // in current implementation over-current
+                afb_log_msg!(Warning, evt, "ocpp set power limit:{}", limit.imax);
+                if limit.imax < data_set.imax as i32 {
+                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", limit.imax)?;
+                }
+            }
+            OcppMsg::Reservation(reservation) => {
+                // in current implementation over-current
+                afb_log_msg!(
+                    Warning,
+                    evt,
+                    "ocpp reservation status:{:?}",
+                    reservation.status
+                );
+                self.reserve(reservation)?;
+            }
+            OcppMsg::Reset => {
+                // in current implementation over-current
+                afb_log_msg!(Warning, evt, "ocpp reset power");
+                AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
+            }
+            _ => {}
+        }
         Ok(())
     }
 

@@ -15,6 +15,20 @@ use afbv4::prelude::*;
 use charging::prelude::*;
 use typesv4::prelude::*;
 
+struct OcppEvtCtx {
+    mgr: &'static ManagerHandle,
+}
+AfbEventRegister!(OcppEvtCtrl, ocpp_event_cb, OcppEvtCtx);
+fn ocpp_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut OcppEvtCtx) -> Result<(), AfbError> {
+    let msg = args.get::<&OcppMsg>(0)?;
+
+    // forward ocpp events to potential listeners
+    afb_log_msg!(Debug, evt, "ocpp_evt:{:?}", msg);
+    ctx.mgr.ocpp(evt, msg)?;
+
+    Ok(())
+}
+
 struct EngyEvtCtx {
     mgr: &'static ManagerHandle,
 }
@@ -183,6 +197,13 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         }))
         .finalize()?;
 
+    let ocpp_handler = AfbEvtHandler::new("ocpp-evt")
+        .set_pattern(to_static_str(format!("{}/*", config.ocpp_api)))
+        .set_callback(Box::new(IecEvtCtx {
+            mgr: manager
+        }))
+        .finalize()?;
+
     let slac_handler = AfbEvtHandler::new("slac-evt")
         .set_pattern(to_static_str(format!("{}/*", config.slac_api)))
         .set_callback(Box::new(SlacEvtCtx { mgr: manager }))
@@ -196,6 +217,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     api.add_evt_handler(engy_handler);
     api.add_evt_handler(iec_handler);
     api.add_evt_handler(slac_handler);
+    api.add_evt_handler(ocpp_handler);
     api.add_event(msg_evt);
     api.add_event(state_event);
     api.add_verb(state_verb);

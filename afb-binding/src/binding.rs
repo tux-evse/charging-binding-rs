@@ -28,6 +28,7 @@ pub struct ApiUserData {
     pub iec_api: &'static str,
     pub slac_api: &'static str,
     pub engy_api: &'static str,
+    pub ocpp_api: &'static str,
 }
 
 impl AfbApiControls for ApiUserData {
@@ -35,6 +36,7 @@ impl AfbApiControls for ApiUserData {
     fn start(&mut self, api: &AfbApi) -> Result<(), AfbError> {
         AfbSubCall::call_sync(api, self.iec_api, "subscribe", true)?;
         AfbSubCall::call_sync(api, self.slac_api, "subscribe", true)?;
+        AfbSubCall::call_sync(api, self.ocpp_api, "subscribe", true)?;
         AfbSubCall::call_sync(api, self.engy_api, "adsp", EnergyAction::SUBSCRIBE)?;
         Ok(())
     }
@@ -51,7 +53,6 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     afb_log_msg!(Info, rootv4, "config:{}", jconf);
 
     // add binding custom converter
-    ocpp_registers()?;
     chmgr_registers()?;
     am62x_registers()?;
     slac_registers()?;
@@ -110,6 +111,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
             iec_api,
             slac_api,
             engy_api,
+            ocpp_api,
         }));
 
     if let Ok(value) = jconf.get::<String>("permission") {

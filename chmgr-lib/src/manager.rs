@@ -232,6 +232,18 @@ impl ManagerHandle {
         Ok(())
     }
 
+pub fn engy_imax(&self, evt: &AfbEventMsg, imax: u32) -> Result<(), AfbError> {
+    let data_set = self.get_state()?;
+    if let PowerRequest::Charging(current) = data_set.power {
+        if current > imax {
+            AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", imax)?;
+            self.event.push(ChargingMsg::Power(PowerRequest::Charging(imax)));
+        }
+    }
+    Ok(())
+}
+
+
 // added for OCPP RemoteStopTransaction
 pub fn powerctrl(&self, allow: bool) -> Result<(), AfbError> {
     let mut data_set = self.get_state()?;

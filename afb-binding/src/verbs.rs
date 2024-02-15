@@ -165,7 +165,7 @@ fn remote_power_callback(
 ) -> Result<(), AfbError> {
     let enable = args.get::<bool>(0)?;
 
-    ctx.mgr.power(enable)?;
+    ctx.mgr.powerctrl(enable)?;
 
     request.reply(AFB_NO_DATA, 0);
     Ok(())

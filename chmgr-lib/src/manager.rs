@@ -187,7 +187,7 @@ impl ManagerHandle {
     }
 
     pub fn ocpp(&self, evt: &AfbEventMsg, msg: &OcppMsg) -> Result<(), AfbError> {
-        let data_set = self.get_state()?;
+        let mut data_set = self.get_state()?;
 
         match msg {
             OcppMsg::PowerLimit(limit) => {
@@ -212,6 +212,14 @@ impl ManagerHandle {
                 afb_log_msg!(Warning, evt, "ocpp reset power");
                 AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
             }
+
+            OcppMsg::RemoteStopTransaction (bool) => {
+                // new event for re mote stop
+                afb_log_msg!(Warning, evt, "ocpp stop received");
+                AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", false)?;
+                data_set.power = PowerRequest::Idle;
+            }
+
             _ => {}
         }
         Ok(())

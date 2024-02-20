@@ -179,7 +179,7 @@ impl ManagerHandle {
         let mut data_set = self.get_state()?;
         data_set.iso = iso_state;
 
-        AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
+        AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", true)?;
         self.event.push(ChargingMsg::Iso(data_set.iso));
         self.event.push(ChargingMsg::Power(PowerRequest::Start));
         afb_log_msg!(Notice, self.event, "Slac|Auth done allow power");

@@ -108,7 +108,7 @@ impl ManagerHandle {
     }
 
     pub fn push_state(&self) -> Result<(), AfbError> {
-        let data_set = self.get_state()?;
+        let data_set = self.check_state()?;
         self.event.push(data_set.clone());
         Ok(())
     }
@@ -184,11 +184,10 @@ impl ManagerHandle {
     }
 
     pub fn ocpp(&self, evt: &AfbEventMsg, msg: &OcppMsg) -> Result<(), AfbError> {
-        let data_set = self.get_state()?;
-
         match msg {
             OcppMsg::PowerLimit(limit) => {
                 // in current implementation over-current
+                let data_set = self.check_state()?;
                 afb_log_msg!(Warning, evt, "ocpp set power limit:{}", limit.imax);
                 if limit.imax < data_set.imax as i32 {
                     AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", limit.imax)?;
@@ -230,7 +229,7 @@ impl ManagerHandle {
     }
 
     pub fn engy_imax(&self, evt: &AfbEventMsg, imax: u32) -> Result<(), AfbError> {
-        let data_set = self.get_state()?;
+        let data_set = self.check_state()?;
 
         if let PowerRequest::Charging(current) = data_set.power {
             if current > imax {

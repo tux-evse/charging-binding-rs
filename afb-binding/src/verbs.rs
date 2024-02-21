@@ -33,7 +33,11 @@ struct EngyIoverCtx {
     mgr: &'static ManagerHandle,
 }
 AfbEventRegister!(EngyIoverCtrl, engy_iover_cb, EngyIoverCtx);
-fn engy_iover_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut EngyIoverCtx) -> Result<(), AfbError> {
+fn engy_iover_cb(
+    evt: &AfbEventMsg,
+    args: &AfbData,
+    ctx: &mut EngyIoverCtx,
+) -> Result<(), AfbError> {
     let msg = args.get::<&MeterDataSet>(0)?;
 
     // forward engy events to potential listeners
@@ -47,7 +51,11 @@ struct EngyIavailCtx {
     mgr: &'static ManagerHandle,
 }
 AfbEventRegister!(EngyIavailCtrl, engy_iavail_cb, EngyIavailCtx);
-fn engy_iavail_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut EngyIavailCtx) -> Result<(), AfbError> {
+fn engy_iavail_cb(
+    evt: &AfbEventMsg,
+    args: &AfbData,
+    ctx: &mut EngyIavailCtx,
+) -> Result<(), AfbError> {
     let msg = args.get::<u32>(0)?;
 
     // forward engy events to potential listeners
@@ -113,7 +121,6 @@ fn state_request_cb(
     args: &AfbData,
     ctx: &mut StateRequestCtx,
 ) -> Result<(), AfbError> {
-
     match args.get::<&ChargingAction>(0)? {
         ChargingAction::READ => {
             let data_set = ctx.mgr.get_state()?;
@@ -135,7 +142,6 @@ fn state_request_cb(
     Ok(())
 }
 
-
 struct ReserveChargerCtx {
     mgr: &'static ManagerHandle,
 }
@@ -145,9 +151,8 @@ fn reserve_charger_cb(
     args: &AfbData,
     ctx: &mut ReserveChargerCtx,
 ) -> Result<(), AfbError> {
-
-    let reservation= args.get::<&ReservationSession>(0)?;
-    let status= ctx.mgr.reserve (&reservation)?;
+    let reservation = args.get::<&ReservationSession>(0)?;
+    let status = ctx.mgr.reserve(&reservation)?;
     rqt.reply(status, 0);
 
     Ok(())
@@ -159,22 +164,28 @@ struct TimerCtx {
 // send charging state every tic ms.
 AfbTimerRegister!(TimerCtrl, timer_callback, TimerCtx);
 fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Result<(), AfbError> {
-    let state= ctx.mgr.check_state()?;
+    let state = ctx.mgr.check_state()?;
     ctx.evt.push(state.clone());
     Ok(())
 }
 
 pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
     let msg_evt = AfbEvent::new("msg");
-    let manager = ManagerHandle::new(config.auth_api, config.iec_api, config.engy_api, msg_evt);
+    let manager = ManagerHandle::new(
+        config.auth_api,
+        config.iec_api,
+        config.engy_api,
+        config.ocpp_api,
+        msg_evt,
+    );
 
     let state_event = AfbEvent::new("state");
     AfbTimer::new("tic-timer")
         .set_period(config.tic)
         .set_decount(0)
         .set_callback(Box::new(TimerCtx {
-           mgr: manager,
-           evt: state_event,
+            mgr: manager,
+            evt: state_event,
         }))
         .start()?;
 
@@ -192,9 +203,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         .set_name("reserve")
         .set_info("reserve charging station start/stop data")
         .set_action("['now','delay','cancel']")?
-        .set_callback(Box::new(ReserveChargerCtx {
-            mgr: manager,
-        }))
+        .set_callback(Box::new(ReserveChargerCtx { mgr: manager }))
         .finalize()?;
 
     let subscribe_verb = AfbVerb::new("subscribe-msg")
@@ -206,16 +215,12 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
 
     let iec_handler = AfbEvtHandler::new("iec-evt")
         .set_pattern(to_static_str(format!("{}/*", config.iec_api)))
-        .set_callback(Box::new(IecEvtCtx {
-            mgr: manager
-        }))
+        .set_callback(Box::new(IecEvtCtx { mgr: manager }))
         .finalize()?;
 
     let ocpp_handler = AfbEvtHandler::new("ocpp-evt")
         .set_pattern(to_static_str(format!("{}/*", config.ocpp_api)))
-        .set_callback(Box::new(OcppEvtCtx {
-            mgr: manager
-        }))
+        .set_callback(Box::new(OcppEvtCtx { mgr: manager }))
         .finalize()?;
 
     let slac_handler = AfbEvtHandler::new("slac-evt")
@@ -225,14 +230,13 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
 
     let iover_handler = AfbEvtHandler::new("iover-evt")
         .set_pattern(to_static_str(format!("{}/iover", config.engy_api)))
-        .set_callback(Box::new(EngyIoverCtx {mgr: manager }))
+        .set_callback(Box::new(EngyIoverCtx { mgr: manager }))
         .finalize()?;
 
     let iavail_handler = AfbEvtHandler::new("iavail-evt")
         .set_pattern(to_static_str(format!("{}/iavail", config.engy_api)))
-        .set_callback(Box::new(EngyIavailCtx {mgr: manager }))
+        .set_callback(Box::new(EngyIavailCtx { mgr: manager }))
         .finalize()?;
-
 
     api.add_evt_handler(iover_handler);
     api.add_evt_handler(iavail_handler);

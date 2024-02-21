@@ -19,6 +19,7 @@ pub struct ManagerHandle {
     auth_api: &'static str,
     iec_api: &'static str,
     engy_api: &'static str,
+    ocpp_api: &'static str,
     event: &'static AfbEvent,
 }
 
@@ -27,12 +28,14 @@ impl ManagerHandle {
         auth_api: &'static str,
         iec_api: &'static str,
         engy_api: &'static str,
+        ocpp_api: &'static str,
         event: &'static AfbEvent,
     ) -> &'static mut Self {
         let handle = ManagerHandle {
             auth_api,
             iec_api,
             engy_api,
+            ocpp_api,
             event,
             data_set: RefCell::new(ChargingState::default()),
         };
@@ -267,6 +270,7 @@ impl ManagerHandle {
                     // vehicle start charging
                     data_set.power = PowerRequest::Charging(data_set.imax);
                     AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
+                    AfbSubCall::call_sync(evt.get_apiv4(), self.ocpp_api, "status-notification", OcppStatus::Charging)?;
                 } else {
                     // vehicle stop charging
                     let response = AfbSubCall::call_sync(
@@ -292,6 +296,7 @@ impl ManagerHandle {
 
                 if *value {
                     data_set.plugged = PlugState::Lock;
+                    AfbSubCall::call_sync(evt.get_apiv4(), self.ocpp_api, "status-notification", OcppStatus::Reserved)?;
                 } else {
                     afb_log_msg!(
                         Debug,
@@ -304,6 +309,7 @@ impl ManagerHandle {
                     data_set.power = PowerRequest::Idle;
                     self.event.push(ChargingMsg::Power(data_set.power));
                     AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
+                    AfbSubCall::call_sync(evt.get_apiv4(), self.ocpp_api, "status-notification", OcppStatus::Available)?;
                 }
                 self.event.push(ChargingMsg::Plugged(data_set.plugged));
             }

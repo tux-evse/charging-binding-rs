@@ -235,7 +235,8 @@ impl ManagerHandle {
         if let PowerRequest::Charging(current) = data_set.power {
             if current > imax {
                 AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", imax)?;
-                self.event.push(ChargingMsg::Power(PowerRequest::Charging(imax)));
+                self.event
+                    .push(ChargingMsg::Power(PowerRequest::Charging(imax)));
             }
         }
         Ok(())
@@ -293,7 +294,13 @@ impl ManagerHandle {
                 if *value {
                     data_set.plugged = PlugState::Lock;
                 } else {
-                    // notify idp manager that session is closed
+                    afb_log_msg!(
+                        Debug,
+                        self.event,
+                        "Logout notification api:{}/logout total:{}",
+                        self.auth_api,
+                        data.total
+                    );
                     AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
                     data_set.plugged = PlugState::PlugOut;
                     data_set.power = PowerRequest::Idle;

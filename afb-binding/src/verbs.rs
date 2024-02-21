@@ -213,7 +213,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
 
     let ocpp_handler = AfbEvtHandler::new("ocpp-evt")
         .set_pattern(to_static_str(format!("{}/*", config.ocpp_api)))
-        .set_callback(Box::new(IecEvtCtx {
+        .set_callback(Box::new(OcppEvtCtx {
             mgr: manager
         }))
         .finalize()?;

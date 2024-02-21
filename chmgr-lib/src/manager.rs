@@ -281,6 +281,7 @@ impl ManagerHandle {
                     )?;
                     let data = response.get::<&MeterDataSet>(0)?;
                     data_set.power = PowerRequest::Stop(data.total);
+                    data_set.plugged = PlugState::PlugOut;
                 }
                 self.event.push(ChargingMsg::Power(data_set.power));
             }

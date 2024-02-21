@@ -301,10 +301,10 @@ impl ManagerHandle {
                         self.auth_api,
                         data.total
                     );
-                    AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
                     data_set.plugged = PlugState::PlugOut;
                     data_set.power = PowerRequest::Idle;
                     self.event.push(ChargingMsg::Power(data_set.power));
+                    AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
                 }
                 self.event.push(ChargingMsg::Plugged(data_set.plugged));
             }

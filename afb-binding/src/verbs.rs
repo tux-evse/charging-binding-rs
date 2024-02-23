@@ -29,6 +29,15 @@ fn ocpp_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut OcppEvtCtx) -> Res
     Ok(())
 }
 
+// Fulup TBD handle broadcast energy event
+AfbEventRegister!(EngyIgnoreCtrl, engy_ignore_cb);
+fn engy_ignore_cb(
+    _evt: &AfbEventMsg,
+    _args: &AfbData,
+) -> Result<(), AfbError> {
+    Ok(())
+}
+
 struct EngyIoverCtx {
     mgr: &'static ManagerHandle,
 }
@@ -233,6 +242,11 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         .set_callback(Box::new(EngyIoverCtx { mgr: manager }))
         .finalize()?;
 
+    let ignore_handler = AfbEvtHandler::new("over-limit")
+        .set_pattern(to_static_str(format!("{}/ignore", config.engy_api)))
+        .set_callback(Box::new(EngyIgnoreCtrl {}))
+        .finalize()?;
+
     let iavail_handler = AfbEvtHandler::new("iavail-evt")
         .set_pattern(to_static_str(format!("{}/iavail", config.engy_api)))
         .set_callback(Box::new(EngyIavailCtx { mgr: manager }))
@@ -243,6 +257,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     api.add_evt_handler(iec_handler);
     api.add_evt_handler(slac_handler);
     api.add_evt_handler(ocpp_handler);
+    api.add_evt_handler(ignore_handler);
     api.add_event(msg_evt);
     api.add_event(state_event);
     api.add_verb(state_verb);

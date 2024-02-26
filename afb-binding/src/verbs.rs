@@ -243,7 +243,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         .finalize()?;
 
     let ignore_handler = AfbEvtHandler::new("over-limit")
-        .set_pattern(to_static_str(format!("{}/ignore", config.engy_api)))
+        .set_pattern(to_static_str(format!("{}/over-limit", config.engy_api)))
         .set_callback(Box::new(EngyIgnoreCtrl {}))
         .finalize()?;
 

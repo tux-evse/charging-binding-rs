@@ -160,31 +160,35 @@ impl ManagerHandle {
     }
 
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
-        let iso_state = match msg {
-            SlacStatus::MATCHED => {
-                /* start ISO15118 Fulup TBD should set imax */
-                IsoState::Iso3
-            }
-            SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
-                self.auth_rqt(evt)?; // Warning lock data_set
-                IsoState::Iec
+        let state = self.check_state()?;
+        // ignore slac message when not plugged-in
+        if let PlugState::Lock = state.plugged {
+            let iso_state = match msg {
+                SlacStatus::MATCHED => {
+                    /* start ISO15118 Fulup TBD should set imax */
+                    IsoState::Iso3
+                }
+                SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
+                    self.auth_rqt(evt)?; // Warning lock data_set
+                    IsoState::Iec
+                }
+
+                _ => {
+                    return Ok(()); /* silently ignore any other messages */
+                }
+            };
+
+            // lock data_set only after self.auth_rqt released it
+            {
+                let mut data_set = self.get_state()?;
+                data_set.iso = iso_state;
             }
 
-            _ => {
-                return Ok(()); /* silently ignore any other messages */
-            }
-        };
-
-        // lock data_set only after self.auth_rqt released it
-        {
-            let mut data_set = self.get_state()?;
-            data_set.iso = iso_state;
+            AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
+            self.event.push(ChargingMsg::Iso(iso_state));
+            self.event.push(ChargingMsg::Power(PowerRequest::Start));
+            afb_log_msg!(Notice, self.event, "Slac|Auth done allow power");
         }
-
-        AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
-        self.event.push(ChargingMsg::Iso(iso_state));
-        self.event.push(ChargingMsg::Power(PowerRequest::Start));
-        afb_log_msg!(Notice, self.event, "Slac|Auth done allow power");
         Ok(())
     }
 

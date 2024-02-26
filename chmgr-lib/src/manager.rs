@@ -11,11 +11,11 @@
  */
 
 use afbv4::prelude::*;
-use std::cell::{Ref, RefCell, RefMut};
+use std::sync::{Mutex, MutexGuard};
 use typesv4::prelude::*;
 
 pub struct ManagerHandle {
-    data_set: RefCell<ChargingState>,
+    data_set: Mutex<ChargingState>,
     auth_api: &'static str,
     iec_api: &'static str,
     engy_api: &'static str,
@@ -37,7 +37,7 @@ impl ManagerHandle {
             engy_api,
             ocpp_api,
             event,
-            data_set: RefCell::new(ChargingState::default()),
+            data_set: Mutex::new(ChargingState::default()),
         };
 
         // return a static handle to prevent Rust from complaining when moving/sharing it
@@ -45,19 +45,9 @@ impl ManagerHandle {
     }
 
     #[track_caller]
-    pub fn get_state(&self) -> Result<RefMut<'_, ChargingState>, AfbError> {
-        match self.data_set.try_borrow_mut() {
-            Err(_) => return afb_error!("charging-manager-update", "fail to access &mut data_set"),
-            Ok(value) => Ok(value),
-        }
-    }
-
-    #[track_caller]
-    pub fn check_state(&self) -> Result<Ref<'_, ChargingState>, AfbError> {
-        match self.data_set.try_borrow() {
-            Err(_) => return afb_error!("charging-manager-state", "fail to access &data_set"),
-            Ok(value) => Ok(value),
-        }
+    pub fn get_state(&self) -> Result<MutexGuard<'_, ChargingState>, AfbError> {
+        let guard = self.data_set.lock().unwrap();
+        Ok(guard)
     }
 
     // Fulup TBD reservation is far more complex and should rely on backend interaction
@@ -111,7 +101,7 @@ impl ManagerHandle {
     }
 
     pub fn push_state(&self) -> Result<(), AfbError> {
-        let data_set = self.check_state()?;
+        let data_set = self.get_state()?;
         self.event.push(data_set.clone());
         Ok(())
     }
@@ -160,7 +150,7 @@ impl ManagerHandle {
     }
 
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
-        let state = self.check_state()?;
+        let mut state = self.get_state()?;
         // ignore slac message when not plugged-in
         if let PlugState::Lock = state.plugged {
             let iso_state = match msg {
@@ -177,12 +167,7 @@ impl ManagerHandle {
                     return Ok(()); /* silently ignore any other messages */
                 }
             };
-
-            // lock data_set only after self.auth_rqt released it
-            {
-                let mut data_set = self.get_state()?;
-                data_set.iso = iso_state;
-            }
+            state.iso = iso_state;
 
             AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
             self.event.push(ChargingMsg::Iso(iso_state));
@@ -193,10 +178,10 @@ impl ManagerHandle {
     }
 
     pub fn ocpp(&self, evt: &AfbEventMsg, msg: &OcppMsg) -> Result<(), AfbError> {
+        let data_set = self.get_state()?;
         match msg {
             OcppMsg::PowerLimit(limit) => {
                 // in current implementation over-current
-                let data_set = self.check_state()?;
                 afb_log_msg!(Warning, evt, "ocpp set power limit:{}", limit.imax);
                 if limit.imax < data_set.imax as i32 {
                     AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", limit.imax)?;
@@ -238,7 +223,7 @@ impl ManagerHandle {
     }
 
     pub fn engy_imax(&self, evt: &AfbEventMsg, imax: u32) -> Result<(), AfbError> {
-        let data_set = self.check_state()?;
+        let data_set = self.get_state()?;
 
         if let PowerRequest::Charging(current) = data_set.power {
             if current > imax {
@@ -251,11 +236,11 @@ impl ManagerHandle {
     }
 
     pub fn iec(&self, evt: &AfbEventMsg, msg: &Iec6185Msg) -> Result<(), AfbError> {
+        let mut data_set = self.get_state()?;
         match msg {
             Iec6185Msg::PowerRqt(value) => {
                 afb_log_msg!(Notice, self.event, "eic power-request value:{}", value);
                 let status = {
-                    let mut data_set = self.get_state()?;
                     if *value {
                         // B => C
                         data_set.plugged = PlugState::Lock;
@@ -269,7 +254,6 @@ impl ManagerHandle {
                 self.event.push(ChargingMsg::Plugged(status));
             }
             Iec6185Msg::CableImax(value) => {
-                let mut data_set = self.get_state()?;
                 afb_log_msg!(
                     Notice,
                     self.event,
@@ -280,17 +264,13 @@ impl ManagerHandle {
                 data_set.imax = *value;
             }
             Iec6185Msg::Error(_value) => {
-                let mut data_set = self.get_state()?;
                 data_set.imax = 0;
             }
             Iec6185Msg::RelayOn(value) => {
-                let data_set = self.check_state()?;
                 if *value {
                     // vehicle start charging
-                    {
-                        let mut data_set = self.get_state()?;
-                        data_set.power = PowerRequest::Charging(data_set.imax);
-                    }
+                    let mut data_set = self.get_state()?;
+                    data_set.power = PowerRequest::Charging(data_set.imax);
                     AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
                     AfbSubCall::call_sync(
                         evt.get_apiv4(),
@@ -307,16 +287,14 @@ impl ManagerHandle {
                         EnergyAction::READ,
                     )?;
                     let data = response.get::<&MeterDataSet>(0)?;
-                    {
-                        let mut data_set = self.get_state()?;
-                        data_set.power = PowerRequest::Stop(data.total);
-                        data_set.plugged = PlugState::PlugOut;
-                    }
+                    data_set.power = PowerRequest::Stop(data.total);
+                    data_set.plugged = PlugState::PlugOut;
                 }
                 self.event.push(ChargingMsg::Power(data_set.power));
             }
             Iec6185Msg::Plugged(value) => {
                 // reset authentication and energy session values
+                let mut data_set = self.get_state()?;
                 let response = AfbSubCall::call_sync(
                     evt.get_api(),
                     self.engy_api,
@@ -326,10 +304,7 @@ impl ManagerHandle {
                 let data = response.get::<&MeterDataSet>(0)?;
 
                 let plug_state = if *value {
-                    {
-                        let mut data_set = self.get_state()?;
-                        data_set.plugged = PlugState::Lock;
-                    }
+                    data_set.plugged = PlugState::Lock;
                     AfbSubCall::call_sync(
                         evt.get_apiv4(),
                         self.ocpp_api,
@@ -346,7 +321,6 @@ impl ManagerHandle {
                         data.total
                     );
                     let power = {
-                        let mut data_set = self.get_state()?;
                         data_set.plugged = PlugState::PlugOut;
                         data_set.power = PowerRequest::Idle;
                         data_set.power

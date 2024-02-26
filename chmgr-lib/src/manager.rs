@@ -257,6 +257,7 @@ impl ManagerHandle {
                 } else {    // C => B
                     data_set.plugged = PlugState::PlugOut;
                 }
+                self.event.push(ChargingMsg::Plugged(data_set.plugged));
             }
             Iec6185Msg::CableImax(value) => {
                 afb_log_msg!(

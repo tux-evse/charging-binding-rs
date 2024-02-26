@@ -12,6 +12,7 @@
             "energy_api": "engy",
             "ocpp_api": "ocpp",
             "tic": 3000,
+            "verbosity": 9,
         }
     ]
 }

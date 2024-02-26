@@ -250,7 +250,13 @@ impl ManagerHandle {
         match msg {
             Iec6185Msg::PowerRqt(value) => {
                 afb_log_msg!(Notice, self.event, "eic power-request value:{}", value);
-                data_set.power = PowerRequest::Start;
+
+                if *value { // B => C
+                    data_set.plugged = PlugState::Lock;
+
+                } else {    // C => B
+                    data_set.plugged = PlugState::PlugOut;
+                }
             }
             Iec6185Msg::CableImax(value) => {
                 afb_log_msg!(

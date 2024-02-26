@@ -176,11 +176,13 @@ impl ManagerHandle {
         };
 
         // lock data_set only after self.auth_rqt released it
-        let mut data_set = self.get_state()?;
-        data_set.iso = iso_state;
+        {
+            let mut data_set = self.get_state()?;
+            data_set.iso = iso_state;
+        }
 
         AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
-        self.event.push(ChargingMsg::Iso(data_set.iso));
+        self.event.push(ChargingMsg::Iso(iso_state));
         self.event.push(ChargingMsg::Power(PowerRequest::Start));
         afb_log_msg!(Notice, self.event, "Slac|Auth done allow power");
         Ok(())
@@ -245,21 +247,25 @@ impl ManagerHandle {
     }
 
     pub fn iec(&self, evt: &AfbEventMsg, msg: &Iec6185Msg) -> Result<(), AfbError> {
-        let mut data_set = self.get_state()?;
-
         match msg {
             Iec6185Msg::PowerRqt(value) => {
                 afb_log_msg!(Notice, self.event, "eic power-request value:{}", value);
+                let status = {
+                    let mut data_set = self.get_state()?;
+                    if *value {
+                        // B => C
+                        data_set.plugged = PlugState::Lock;
+                    } else {
+                        // C => B
 
-                if *value { // B => C
-                    data_set.plugged = PlugState::Lock;
-
-                } else {    // C => B
-                    data_set.plugged = PlugState::PlugOut;
-                }
-                self.event.push(ChargingMsg::Plugged(data_set.plugged));
+                        data_set.plugged = PlugState::PlugOut;
+                    }
+                    data_set.plugged
+                };
+                self.event.push(ChargingMsg::Plugged(status));
             }
             Iec6185Msg::CableImax(value) => {
+                let mut data_set = self.get_state()?;
                 afb_log_msg!(
                     Notice,
                     self.event,
@@ -270,14 +276,24 @@ impl ManagerHandle {
                 data_set.imax = *value;
             }
             Iec6185Msg::Error(_value) => {
+                let mut data_set = self.get_state()?;
                 data_set.imax = 0;
             }
             Iec6185Msg::RelayOn(value) => {
+                let data_set = self.check_state()?;
                 if *value {
                     // vehicle start charging
-                    data_set.power = PowerRequest::Charging(data_set.imax);
+                    {
+                        let mut data_set = self.get_state()?;
+                        data_set.power = PowerRequest::Charging(data_set.imax);
+                    }
                     AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
-                    AfbSubCall::call_sync(evt.get_apiv4(), self.ocpp_api, "status-notification", OcppStatus::Charging)?;
+                    AfbSubCall::call_sync(
+                        evt.get_apiv4(),
+                        self.ocpp_api,
+                        "status-notification",
+                        OcppStatus::Charging,
+                    )?;
                 } else {
                     // vehicle stop charging
                     let response = AfbSubCall::call_sync(
@@ -287,8 +303,11 @@ impl ManagerHandle {
                         EnergyAction::READ,
                     )?;
                     let data = response.get::<&MeterDataSet>(0)?;
-                    data_set.power = PowerRequest::Stop(data.total);
-                    data_set.plugged = PlugState::PlugOut;
+                    {
+                        let mut data_set = self.get_state()?;
+                        data_set.power = PowerRequest::Stop(data.total);
+                        data_set.plugged = PlugState::PlugOut;
+                    }
                 }
                 self.event.push(ChargingMsg::Power(data_set.power));
             }
@@ -302,9 +321,18 @@ impl ManagerHandle {
                 )?;
                 let data = response.get::<&MeterDataSet>(0)?;
 
-                if *value {
-                    data_set.plugged = PlugState::Lock;
-                    AfbSubCall::call_sync(evt.get_apiv4(), self.ocpp_api, "status-notification", OcppStatus::Reserved)?;
+                let plug_state = if *value {
+                    {
+                        let mut data_set = self.get_state()?;
+                        data_set.plugged = PlugState::Lock;
+                    }
+                    AfbSubCall::call_sync(
+                        evt.get_apiv4(),
+                        self.ocpp_api,
+                        "status-notification",
+                        OcppStatus::Reserved,
+                    )?;
+                    PlugState::Lock
                 } else {
                     afb_log_msg!(
                         Debug,
@@ -313,13 +341,23 @@ impl ManagerHandle {
                         self.auth_api,
                         data.total
                     );
-                    data_set.plugged = PlugState::PlugOut;
-                    data_set.power = PowerRequest::Idle;
-                    self.event.push(ChargingMsg::Power(data_set.power));
+                    let power = {
+                        let mut data_set = self.get_state()?;
+                        data_set.plugged = PlugState::PlugOut;
+                        data_set.power = PowerRequest::Idle;
+                        data_set.power
+                    };
+                    self.event.push(ChargingMsg::Power(power));
                     AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
-                    AfbSubCall::call_sync(evt.get_apiv4(), self.ocpp_api, "status-notification", OcppStatus::Available)?;
-                }
-                self.event.push(ChargingMsg::Plugged(data_set.plugged));
+                    AfbSubCall::call_sync(
+                        evt.get_apiv4(),
+                        self.ocpp_api,
+                        "status-notification",
+                        OcppStatus::Available,
+                    )?;
+                    PlugState::PlugOut
+                };
+                self.event.push(ChargingMsg::Plugged(plug_state));
             }
         }
         Ok(())

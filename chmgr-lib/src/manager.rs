@@ -106,8 +106,11 @@ impl ManagerHandle {
         Ok(())
     }
 
-    fn auth_rqt(&self, data_set: &mut MutexGuard<ChargingState>, evt: &AfbEventMsg) -> Result<(), AfbError> {
-
+    fn auth_rqt(
+        &self,
+        data_set: &mut MutexGuard<ChargingState>,
+        evt: &AfbEventMsg,
+    ) -> Result<(), AfbError> {
         afb_log_msg!(Notice, self.event, "Requesting idp-login");
         data_set.auth = AuthMsg::Pending;
         self.event.push(ChargingMsg::Auth(data_set.auth));
@@ -150,29 +153,26 @@ impl ManagerHandle {
 
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
         let mut state = self.get_state()?;
-        // ignore slac message when not plugged-in
-        if let PlugState::Lock = state.plugged {
-            let iso_state = match msg {
-                SlacStatus::MATCHED => {
-                    /* start ISO15118 Fulup TBD should set imax */
-                    IsoState::Iso3
-                }
-                SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
-                    self.auth_rqt(&mut state, evt)?; // Warning lock data_set
-                    IsoState::Iec
-                }
+        let iso_state = match msg {
+            SlacStatus::MATCHED => {
+                /* start ISO15118 Fulup TBD should set imax */
+                IsoState::Iso3
+            }
+            SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
+                self.auth_rqt(&mut state, evt)?; // Warning lock data_set
+                IsoState::Iec
+            }
 
-                _ => {
-                    return Ok(()); /* silently ignore any other messages */
-                }
-            };
-            state.iso = iso_state;
+            _ => {
+                return Ok(()); /* silently ignore any other messages */
+            }
+        };
+        state.iso = iso_state;
 
-            AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
-            self.event.push(ChargingMsg::Iso(iso_state));
-            self.event.push(ChargingMsg::Power(PowerRequest::Start));
-            afb_log_msg!(Notice, self.event, "Slac|Auth done allow power");
-        }
+        AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
+        self.event.push(ChargingMsg::Iso(iso_state));
+        self.event.push(ChargingMsg::Power(PowerRequest::Start));
+        afb_log_msg!(Notice, self.event, "Slac|Auth done allow power");
         Ok(())
     }
 

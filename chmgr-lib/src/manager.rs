@@ -269,7 +269,6 @@ impl ManagerHandle {
             Iec6185Msg::RelayOn(value) => {
                 if *value {
                     // vehicle start charging
-                    let mut data_set = self.get_state()?;
                     data_set.power = PowerRequest::Charging(data_set.imax);
                     AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
                     AfbSubCall::call_sync(
@@ -294,7 +293,6 @@ impl ManagerHandle {
             }
             Iec6185Msg::Plugged(value) => {
                 // reset authentication and energy session values
-                let mut data_set = self.get_state()?;
                 let response = AfbSubCall::call_sync(
                     evt.get_api(),
                     self.engy_api,

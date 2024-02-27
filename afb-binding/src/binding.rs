@@ -37,8 +37,8 @@ impl AfbApiControls for ApiUserData {
         AfbSubCall::call_sync(api, self.iec_api, "subscribe", true)?;
         AfbSubCall::call_sync(api, self.slac_api, "subscribe", true)?;
         AfbSubCall::call_sync(api, self.ocpp_api, "subscribe", true)?;
-        AfbSubCall::call_sync(api, self.engy_api, "iover", EnergyAction::SUBSCRIBE)?;
         AfbSubCall::call_sync(api, self.engy_api, "iavail", EnergyAction::SUBSCRIBE)?;
+        AfbSubCall::call_sync(api, self.engy_api, "iover", EnergyAction::SUBSCRIBE)?;
         Ok(())
     }
 

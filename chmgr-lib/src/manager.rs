@@ -274,7 +274,7 @@ impl ManagerHandle {
                         evt.get_apiv4(),
                         self.ocpp_api,
                         "status-notification",
-                        OcppStatus::Charging,
+                        OcppChargerStatus::Charging,
                     )?;
                 } else {
                     // vehicle stop charging
@@ -306,7 +306,7 @@ impl ManagerHandle {
                         evt.get_apiv4(),
                         self.ocpp_api,
                         "status-notification",
-                        OcppStatus::Reserved,
+                        OcppChargerStatus::Reserved,
                     )?;
                     PlugState::Lock
                 } else {
@@ -324,12 +324,6 @@ impl ManagerHandle {
                     };
                     self.event.push(ChargingMsg::Power(power));
                     AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
-                    AfbSubCall::call_sync(
-                        evt.get_apiv4(),
-                        self.ocpp_api,
-                        "status-notification",
-                        OcppStatus::Available,
-                    )?;
                     PlugState::PlugOut
                 };
                 self.event.push(ChargingMsg::Plugged(plug_state));

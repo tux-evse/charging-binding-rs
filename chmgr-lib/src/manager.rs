@@ -106,8 +106,7 @@ impl ManagerHandle {
         Ok(())
     }
 
-    fn auth_rqt(&self, evt: &AfbEventMsg) -> Result<(), AfbError> {
-        let mut data_set = self.get_state()?;
+    fn auth_rqt(&self, data_set: &mut MutexGuard<ChargingState>, evt: &AfbEventMsg) -> Result<(), AfbError> {
 
         afb_log_msg!(Notice, self.event, "Requesting idp-login");
         data_set.auth = AuthMsg::Pending;
@@ -159,7 +158,7 @@ impl ManagerHandle {
                     IsoState::Iso3
                 }
                 SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
-                    self.auth_rqt(evt)?; // Warning lock data_set
+                    self.auth_rqt(&mut state, evt)?; // Warning lock data_set
                     IsoState::Iec
                 }
 

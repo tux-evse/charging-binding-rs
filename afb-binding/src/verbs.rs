@@ -189,6 +189,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     );
 
     let state_event = AfbEvent::new("state");
+    if config.tic > 0 {
     AfbTimer::new("tic-timer")
         .set_period(config.tic)
         .set_decount(0)
@@ -197,6 +198,7 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
             evt: state_event,
         }))
         .start()?;
+    }
 
     let state_verb = AfbVerb::new("charging-state")
         .set_name("state")

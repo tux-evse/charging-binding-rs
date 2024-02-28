@@ -23,6 +23,11 @@ pub struct ManagerHandle {
     event: &'static AfbEvent,
 }
 
+AfbCallRegister!(IgnoreRspCtrl, ignore_rsp_cb);
+fn ignore_rsp_cb(_api: &AfbApi, _args: &AfbData) -> Result<(), AfbError> {
+    Ok(())
+}
+
 impl ManagerHandle {
     pub fn new(
         auth_api: &'static str,
@@ -136,7 +141,7 @@ impl ManagerHandle {
                 self.event.push(ChargingMsg::Auth(data_set.auth));
 
                 // set imax configuration
-                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
+                AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "imax", data_set.imax, Box::new(IgnoreRspCtrl))?;
             }
             Err(_) => {
                 data_set.auth = AuthMsg::Fail;
@@ -168,11 +173,15 @@ impl ManagerHandle {
             }
         };
         state.iso = iso_state;
-
-        AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", true)?;
+        AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "power", true, Box::new(IgnoreRspCtrl{}))?;
         self.event.push(ChargingMsg::Iso(iso_state));
         self.event.push(ChargingMsg::Power(PowerRequest::Start));
-        afb_log_msg!(Notice, self.event, "Slac|Auth done allow power");
+        afb_log_msg!(
+            Notice,
+            self.event,
+            "Slac+Auth done allow power iso_mode:{:?}",
+            iso_state
+        );
         Ok(())
     }
 

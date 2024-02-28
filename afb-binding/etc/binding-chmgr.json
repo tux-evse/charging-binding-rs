@@ -11,7 +11,7 @@
             "auth_api": "auth",
             "energy_api": "engy",
             "ocpp_api": "ocpp",
-            "tic": 3000,
+            "tic": 10000,
             "verbosity": 9,
         }
     ]

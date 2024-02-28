@@ -85,12 +85,12 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         64
     };
 
-    let iec_api = to_static_str(jconf.get::<String>("iec_api")?);
-    let slac_api = to_static_str(jconf.get::<String>("slac_api")?);
-    let auth_api = to_static_str(jconf.get::<String>("auth_api")?);
-    let engy_api = to_static_str(jconf.get::<String>("energy_api")?);
-    let ocpp_api = to_static_str(jconf.get::<String>("ocpp_api")?);
-    let tic = jconf.get::<u32>("tic")?;
+    let iec_api = jconf.get::<&'static str>("iec_api")?;
+    let slac_api = jconf.get::<&'static str>("slac_api")?;
+    let auth_api = jconf.get::<&'static str>("auth_api")?;
+    let engy_api = jconf.get::<&'static str>("energy_api")?;
+    let ocpp_api = jconf.get::<&'static str>("ocpp_api")?;
+    let tic = jconf.default::<u32>("tic", 0)?;
     let config = BindingCfg {
         iec_api,
         slac_api,

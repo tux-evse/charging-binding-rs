@@ -124,7 +124,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         api.set_verbosity(value);
     };
 
-    register_verbs(api, config)?;
+    register_verbs(rootv4, api, config)?;
     Ok(api.finalize()?)
 }
 

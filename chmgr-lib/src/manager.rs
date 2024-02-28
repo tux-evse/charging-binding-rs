@@ -15,6 +15,7 @@ use std::sync::{Mutex, MutexGuard};
 use typesv4::prelude::*;
 
 pub struct ManagerHandle {
+    apiv4: AfbApiV4,
     data_set: Mutex<ChargingState>,
     auth_api: &'static str,
     iec_api: &'static str,
@@ -25,6 +26,7 @@ pub struct ManagerHandle {
 
 impl ManagerHandle {
     pub fn new(
+        apiv4: AfbApiV4,
         auth_api: &'static str,
         iec_api: &'static str,
         engy_api: &'static str,
@@ -32,6 +34,7 @@ impl ManagerHandle {
         event: &'static AfbEvent,
     ) -> &'static mut Self {
         let handle = ManagerHandle {
+            apiv4,
             auth_api,
             iec_api,
             engy_api,
@@ -177,7 +180,7 @@ impl ManagerHandle {
     }
 
     pub fn ocpp(&self, evt: &AfbEventMsg, msg: &OcppMsg) -> Result<(), AfbError> {
-        let data_set = self.get_state()?;
+        let mut data_set = self.get_state()?;
         match msg {
             OcppMsg::PowerLimit(limit) => {
                 // in current implementation over-current
@@ -201,6 +204,14 @@ impl ManagerHandle {
                 afb_log_msg!(Warning, evt, "ocpp reset power");
                 AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
             }
+
+            OcppMsg::RemoteStopTransaction (bool) => {
+                // new event for re mote stop
+                afb_log_msg!(Warning, evt, "ocpp stop received");
+                AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", false)?;
+                data_set.power = PowerRequest::Idle;
+            }
+
             _ => {}
         }
         Ok(())
@@ -233,6 +244,24 @@ impl ManagerHandle {
         }
         Ok(())
     }
+
+
+// added for OCPP RemoteStopTransaction
+pub fn powerctrl(&self, allow: bool) -> Result<(), AfbError> {
+    let mut data_set = self.get_state()?;
+
+    if allow {
+        afb_log_msg!(Notice, None, "function remote power triggered, allow power");
+        AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", true)?;
+    }
+    else {
+        afb_log_msg!(Notice, None, "function remote power triggered, stop power");
+        AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", false)?;
+        data_set.power = PowerRequest::Idle;
+    }
+
+    Ok(())
+}
 
     pub fn iec(&self, evt: &AfbEventMsg, msg: &Iec6185Msg) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;

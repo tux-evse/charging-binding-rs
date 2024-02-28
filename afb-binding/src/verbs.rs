@@ -166,6 +166,25 @@ fn reserve_charger_cb(
 
     Ok(())
 }
+
+struct RemotePowerData {
+    mgr: &'static ManagerHandle,
+}
+
+AfbVerbRegister!(RemotePowerCtrl, remote_power_callback, RemotePowerData);
+fn remote_power_callback(
+    request: &AfbRequest,
+    args: &AfbData,
+    ctx: &mut RemotePowerData,
+) -> Result<(), AfbError> {
+    let enable = args.get::<bool>(0)?;
+
+    ctx.mgr.powerctrl(enable)?;
+
+    request.reply(AFB_NO_DATA, 0);
+    Ok(())
+}
+
 struct TimerCtx {
     mgr: &'static ManagerHandle,
     evt: &'static AfbEvent,
@@ -178,9 +197,10 @@ fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Resul
     Ok(())
 }
 
-pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
+pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCfg) -> Result<(), AfbError> {
     let msg_evt = AfbEvent::new("msg");
     let manager = ManagerHandle::new(
+        apiv4,
         config.auth_api,
         config.iec_api,
         config.engy_api,
@@ -254,6 +274,15 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
         .set_callback(Box::new(EngyIavailCtx { mgr: manager }))
         .finalize()?;
 
+    let ctx = RemotePowerData {
+        mgr: manager,
+    };
+    let remote_power_verb = AfbVerb::new("remote_power")
+        .set_callback(Box::new(ctx))
+        .set_info("allow power (true/false)")
+        .set_usage("true/false")
+        .finalize()?;
+
     api.add_evt_handler(iover_handler);
     api.add_evt_handler(iavail_handler);
     api.add_evt_handler(iec_handler);
@@ -264,7 +293,9 @@ pub(crate) fn register_verbs(api: &mut AfbApi, config: BindingCfg) -> Result<(),
     api.add_event(state_event);
     api.add_verb(state_verb);
     api.add_verb(reserve_verb);
-    api.add_verb(subscribe_verb);
+    api.add_verb(subscribe_verb);   
+
+    api.add_verb(remote_power_verb);
 
     Ok(())
 }

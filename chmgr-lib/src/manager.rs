@@ -214,10 +214,10 @@ impl ManagerHandle {
                 AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
             }
 
-            OcppMsg::remote_stop_transaction (bool) => {
+            OcppMsg::Transaction (status, tid) => {
                 // new event for re mote stop
-                afb_log_msg!(Warning, evt, "ocpp stop received");
-                AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", false)?;
+                afb_log_msg!(Warning, evt, "ocpp transaction power:{} received tid:{}", status, tid);
+                AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", *status)?;
                 data_set.power = PowerRequest::Idle;
             }
 

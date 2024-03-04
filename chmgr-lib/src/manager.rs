@@ -133,8 +133,8 @@ impl ManagerHandle {
                     self.engy_api,
                     "config",
                     EngyConfSet {
-                        pmax: data_set.pmax as i32,
-                        imax: data_set.imax as i32,
+                        pmax: contract.pmax as i32,
+                        imax: contract.imax as i32,
                     },
                 )?;
 

@@ -24,8 +24,17 @@ pub struct ManagerHandle {
     event: &'static AfbEvent,
 }
 
-AfbCallRegister!(IgnoreRspCtrl, ignore_rsp_cb);
-fn ignore_rsp_cb(_api: &AfbApi, _args: &AfbData) -> Result<(), AfbError> {
+struct ignoreRspCtx {
+}
+
+fn ignore_rsp_cb(
+    _api: &AfbApi, 
+    _args: &AfbRqtData,
+    _ctx: &AfbCtxData,
+) -> Result<(), AfbError> {
+
+    let _ctx = _ctx.get_ref::<ignoreRspCtx>()?;
+
     Ok(())
 }
 
@@ -144,7 +153,7 @@ impl ManagerHandle {
                 self.event.push(ChargingMsg::Auth(data_set.auth));
 
                 // set imax configuration
-                AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "imax", data_set.imax, Box::new(IgnoreRspCtrl))?;
+                AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "imax", data_set.imax, ignore_rsp_cb,ignoreRspCtx{})?;
             }
             Err(_) => {
                 data_set.auth = AuthMsg::Fail;
@@ -176,7 +185,7 @@ impl ManagerHandle {
             }
         };
         state.iso = iso_state;
-        AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "power", true, Box::new(IgnoreRspCtrl{}))?;
+    	AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "power", true, ignore_rsp_cb, ignoreRspCtx{})?;
         self.event.push(ChargingMsg::Iso(iso_state));
         self.event.push(ChargingMsg::Power(PowerRequest::Start));
         afb_log_msg!(
@@ -217,7 +226,7 @@ impl ManagerHandle {
             OcppMsg::Transaction (status, tid) => {
                 // new event for re mote stop
                 afb_log_msg!(Warning, evt, "ocpp transaction power:{} received tid:{}", status, tid);
-                AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", *status)?;
+                let response = AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", *status)?;
                 AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
                 data_set.power = PowerRequest::Idle;
             }
@@ -256,22 +265,22 @@ impl ManagerHandle {
     }
 
 
-// added for OCPP RemoteStopTransaction
-pub fn powerctrl(&self, allow: bool) -> Result<(), AfbError> {
-    let mut data_set = self.get_state()?;
+    // added for OCPP RemoteStopTransaction
+    pub fn powerctrl(&self, allow: bool) -> Result<(), AfbError> {
+        let mut data_set = self.get_state()?;
 
-    if allow {
-        afb_log_msg!(Notice, None, "function remote power triggered, allow power");
-        AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", true)?;
-    }
-    else {
-        afb_log_msg!(Notice, None, "function remote power triggered, stop power");
-        AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", false)?;
-        data_set.power = PowerRequest::Idle;
-    }
+        if allow {
+            afb_log_msg!(Notice, None, "function remote power triggered, allow power");
+            AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", true)?;
+        }
+        else {
+            afb_log_msg!(Notice, None, "function remote power triggered, stop power");
+            AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", false)?;
+            data_set.power = PowerRequest::Idle;
+        }
 
-    Ok(())
-}
+        Ok(())
+    }
 
     pub fn iec(&self, evt: &AfbEventMsg, msg: &Iec6185Msg) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;

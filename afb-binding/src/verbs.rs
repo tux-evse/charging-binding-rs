@@ -18,8 +18,11 @@ use typesv4::prelude::*;
 struct OcppEvtCtx {
     mgr: &'static ManagerHandle,
 }
-AfbEventRegister!(OcppEvtCtrl, ocpp_event_cb, OcppEvtCtx);
-fn ocpp_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut OcppEvtCtx) -> Result<(), AfbError> {
+
+fn ocpp_event_cb(evt: &AfbEventMsg, args: &AfbRqtData, ctx: &AfbCtxData) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<OcppEvtCtx>()?;
+    
     let msg = args.get::<&OcppMsg>(0)?;
 
     // forward ocpp events to potential listeners
@@ -29,24 +32,33 @@ fn ocpp_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut OcppEvtCtx) -> Res
     Ok(())
 }
 
+struct ignoreCtx {
+}
+
 // Fulup TBD handle broadcast energy event
-AfbEventRegister!(EngyIgnoreCtrl, engy_ignore_cb);
 fn engy_ignore_cb(
     _evt: &AfbEventMsg,
-    _args: &AfbData,
+    _args: &AfbRqtData,
+    _ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let _ctx = _ctx.get_ref::<ignoreCtx>()?;
+
     Ok(())
 }
 
 struct EngyIoverCtx {
     mgr: &'static ManagerHandle,
 }
-AfbEventRegister!(EngyIoverCtrl, engy_iover_cb, EngyIoverCtx);
+
 fn engy_iover_cb(
     evt: &AfbEventMsg,
-    args: &AfbData,
-    ctx: &mut EngyIoverCtx,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<EngyIoverCtx>()?;
+
     let msg = args.get::<&MeterDataSet>(0)?;
 
     // forward engy events to potential listeners
@@ -59,12 +71,15 @@ fn engy_iover_cb(
 struct EngyIavailCtx {
     mgr: &'static ManagerHandle,
 }
-AfbEventRegister!(EngyIavailCtrl, engy_iavail_cb, EngyIavailCtx);
+
 fn engy_iavail_cb(
     evt: &AfbEventMsg,
-    args: &AfbData,
-    ctx: &mut EngyIavailCtx,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<EngyIavailCtx>()?;
+
     let msg = args.get::<u32>(0)?;
 
     // forward engy events to potential listeners
@@ -77,8 +92,11 @@ fn engy_iavail_cb(
 struct SlacEvtCtx {
     mgr: &'static ManagerHandle,
 }
-AfbEventRegister!(SlacEvtCtrl, slac_event_cb, SlacEvtCtx);
-fn slac_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut SlacEvtCtx) -> Result<(), AfbError> {
+
+fn slac_event_cb(evt: &AfbEventMsg, args: &AfbRqtData, ctx: &AfbCtxData) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<SlacEvtCtx>()?;
+
     let msg = args.get::<&SlacStatus>(0)?;
 
     // forward slac events to potential listeners
@@ -91,8 +109,11 @@ fn slac_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut SlacEvtCtx) -> Res
 struct IecEvtCtx {
     mgr: &'static ManagerHandle,
 }
-AfbEventRegister!(IecEvtCtrl, iec_event_cb, IecEvtCtx);
-fn iec_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut IecEvtCtx) -> Result<(), AfbError> {
+
+fn iec_event_cb(evt: &AfbEventMsg, args: &AfbRqtData, ctx: &AfbCtxData,) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<IecEvtCtx>()?;
+
     let msg = args.get::<&Iec6185Msg>(0)?;
 
     afb_log_msg!(Debug, evt, "iec_evt:{:?}", msg.clone());
@@ -104,12 +125,15 @@ fn iec_event_cb(evt: &AfbEventMsg, args: &AfbData, ctx: &mut IecEvtCtx) -> Resul
 struct SubscribeCtx {
     event: &'static AfbEvent,
 }
-AfbVerbRegister!(SubscribeCtrl, subscribe_callback, SubscribeCtx);
+
 fn subscribe_callback(
     request: &AfbRequest,
-    args: &AfbData,
-    ctx: &mut SubscribeCtx,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<SubscribeCtx>()?;
+
     let subcription = args.get::<bool>(0)?;
     if subcription {
         ctx.event.subscribe(request)?;
@@ -124,12 +148,15 @@ struct StateRequestCtx {
     mgr: &'static ManagerHandle,
     evt: &'static AfbEvent,
 }
-AfbVerbRegister!(StateRequestVerb, state_request_cb, StateRequestCtx);
+
 fn state_request_cb(
     rqt: &AfbRequest,
-    args: &AfbData,
-    ctx: &mut StateRequestCtx,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<StateRequestCtx>()?;
+
     match args.get::<&ChargingAction>(0)? {
         ChargingAction::READ => {
             let data_set = ctx.mgr.get_state()?;
@@ -154,12 +181,15 @@ fn state_request_cb(
 struct ReserveChargerCtx {
     mgr: &'static ManagerHandle,
 }
-AfbVerbRegister!(ReservechargerVerb, reserve_charger_cb, ReserveChargerCtx);
+
 fn reserve_charger_cb(
     rqt: &AfbRequest,
-    args: &AfbData,
-    ctx: &mut ReserveChargerCtx,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<ReserveChargerCtx>()?;
+
     let reservation = args.get::<&ReservationSession>(0)?;
     let status = ctx.mgr.reserve(&reservation)?;
     rqt.reply(status, 0);
@@ -171,12 +201,14 @@ struct RemotePowerData {
     mgr: &'static ManagerHandle,
 }
 
-AfbVerbRegister!(RemotePowerCtrl, remote_power_callback, RemotePowerData);
 fn remote_power_callback(
     request: &AfbRequest,
-    args: &AfbData,
-    ctx: &mut RemotePowerData,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<RemotePowerData>()?;
+
     let enable = args.get::<bool>(0)?;
 
     ctx.mgr.powerctrl(enable)?;
@@ -190,8 +222,10 @@ struct TimerCtx {
     evt: &'static AfbEvent,
 }
 // send charging state every tic ms.
-AfbTimerRegister!(TimerCtrl, timer_callback, TimerCtx);
-fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &mut TimerCtx) -> Result<(), AfbError> {
+fn timer_callback(_timer: &AfbTimer, _decount: u32, ctx: &AfbCtxData) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<TimerCtx>()?;
+
     let state = ctx.mgr.get_state()?;
     ctx.evt.push(state.clone());
     Ok(())
@@ -213,72 +247,99 @@ pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCf
     AfbTimer::new("tic-timer")
         .set_period(config.tic)
         .set_decount(0)
-        .set_callback(Box::new(TimerCtx {
+        .set_callback(timer_callback)
+        .set_context(TimerCtx{
             mgr: manager,
             evt: state_event,
-        }))
+        })
         .start()?;
     }
 
     let state_verb = AfbVerb::new("charging-state")
         .set_name("state")
         .set_info("current charging state")
-        .set_action("['read','subscribe','unsubscribe']")?
-        .set_callback(Box::new(StateRequestCtx {
+        .set_actions("['read','subscribe','unsubscribe']")?
+        .set_callback(state_request_cb)
+        .set_context(StateRequestCtx {
             mgr: manager,
             evt: state_event,
-        }))
+        })
         .finalize()?;
 
     let reserve_verb = AfbVerb::new("reserve-charger")
         .set_name("reserve")
         .set_info("reserve charging station start/stop data")
-        .set_action("['now','delay','cancel']")?
-        .set_callback(Box::new(ReserveChargerCtx { mgr: manager }))
+        .set_actions("['now','delay','cancel']")?
+        .set_callback(reserve_charger_cb)
+        .set_context(ReserveChargerCtx { 
+            mgr: manager 
+        })
         .finalize()?;
 
     let subscribe_verb = AfbVerb::new("subscribe-msg")
         .set_name("subscribe")
-        .set_callback(Box::new(SubscribeCtx { event: msg_evt }))
+        .set_callback(subscribe_callback)
+        .set_context(SubscribeCtx { 
+            event: msg_evt 
+        })
         .set_info("subscribe charging events")
         .set_usage("true|false")
         .finalize()?;
 
     let iec_handler = AfbEvtHandler::new("iec-evt")
         .set_pattern(to_static_str(format!("{}/*", config.iec_api)))
-        .set_callback(Box::new(IecEvtCtx { mgr: manager }))
+        .set_callback(iec_event_cb)
+        .set_context(IecEvtCtx { 
+            mgr: manager 
+        })
         .finalize()?;
 
     let ocpp_handler = AfbEvtHandler::new("ocpp-evt")
         .set_pattern(to_static_str(format!("{}/*", config.ocpp_api)))
-        .set_callback(Box::new(OcppEvtCtx { mgr: manager }))
+        .set_callback(ocpp_event_cb)
+        .set_context(OcppEvtCtx {
+             mgr: manager 
+        })
         .finalize()?;
 
     let slac_handler = AfbEvtHandler::new("slac-evt")
         .set_pattern(to_static_str(format!("{}/*", config.slac_api)))
-        .set_callback(Box::new(SlacEvtCtx { mgr: manager }))
+        .set_callback(slac_event_cb)
+        .set_context(SlacEvtCtx {
+             mgr: manager 
+        })
         .finalize()?;
 
     let iover_handler = AfbEvtHandler::new("iover-evt")
         .set_pattern(to_static_str(format!("{}/iover", config.engy_api)))
-        .set_callback(Box::new(EngyIoverCtx { mgr: manager }))
+        .set_callback(engy_iover_cb)
+        .set_context(EngyIoverCtx {
+             mgr: manager 
+        })
         .finalize()?;
 
     let ignore_handler = AfbEvtHandler::new("over-limit")
         .set_pattern(to_static_str(format!("{}/over-limit", config.engy_api)))
-        .set_callback(Box::new(EngyIgnoreCtrl {}))
+        .set_callback(engy_ignore_cb)
+        .set_context(ignoreCtx {})
         .finalize()?;
 
     let iavail_handler = AfbEvtHandler::new("iavail-evt")
         .set_pattern(to_static_str(format!("{}/iavail", config.engy_api)))
-        .set_callback(Box::new(EngyIavailCtx { mgr: manager }))
+        .set_callback(engy_iavail_cb)
+        .set_context(EngyIavailCtx {
+             mgr: manager 
+        })
         .finalize()?;
 
     let ctx = RemotePowerData {
         mgr: manager,
     };
     let remote_power_verb = AfbVerb::new("remote_power")
-        .set_callback(Box::new(ctx))
+        .set_callback(remote_power_callback)
+        .set_context(RemotePowerData {
+            mgr: manager
+        })
         .set_info("allow power (true/false)")
         .set_usage("true/false")
         .finalize()?;

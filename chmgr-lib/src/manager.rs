@@ -226,8 +226,9 @@ impl ManagerHandle {
             OcppMsg::Transaction (status, tid) => {
                 // new event for re mote stop
                 afb_log_msg!(Warning, evt, "ocpp transaction power:{} received tid:{}", status, tid);
-                AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", *status)?;
-                //AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
+                let response = AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", *status)?;
+                let data = response.get::<&MeterDataSet>(0)?;
+                AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
                 data_set.power = PowerRequest::Idle;
             }
 

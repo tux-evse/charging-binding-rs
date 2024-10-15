@@ -24,10 +24,10 @@ pub struct ManagerHandle {
     event: &'static AfbEvent,
 }
 
-struct ignoreRspCtx {}
+struct IgnoreRspCtx {}
 
 fn ignore_rsp_cb(_api: &AfbApi, _args: &AfbRqtData, _ctx: &AfbCtxData) -> Result<(), AfbError> {
-    let _ctx = _ctx.get_ref::<ignoreRspCtx>()?;
+    let _ctx = _ctx.get_ref::<IgnoreRspCtx>()?;
 
     Ok(())
 }
@@ -153,7 +153,7 @@ impl ManagerHandle {
                     "imax",
                     data_set.imax,
                     ignore_rsp_cb,
-                    ignoreRspCtx {},
+                    IgnoreRspCtx {},
                 )?;
             }
             Err(_) => {
@@ -194,7 +194,7 @@ impl ManagerHandle {
                 "power",
                 true,
                 ignore_rsp_cb,
-                ignoreRspCtx {},
+                IgnoreRspCtx {},
             )?;
             self.event.push(ChargingMsg::Iso(iso_state));
             self.event.push(ChargingMsg::Power(PowerRequest::Start));

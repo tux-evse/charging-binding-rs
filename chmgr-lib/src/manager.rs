@@ -24,15 +24,9 @@ pub struct ManagerHandle {
     event: &'static AfbEvent,
 }
 
-struct ignoreRspCtx {
-}
+struct ignoreRspCtx {}
 
-fn ignore_rsp_cb(
-    _api: &AfbApi, 
-    _args: &AfbRqtData,
-    _ctx: &AfbCtxData,
-) -> Result<(), AfbError> {
-
+fn ignore_rsp_cb(_api: &AfbApi, _args: &AfbRqtData, _ctx: &AfbCtxData) -> Result<(), AfbError> {
     let _ctx = _ctx.get_ref::<ignoreRspCtx>()?;
 
     Ok(())
@@ -153,7 +147,14 @@ impl ManagerHandle {
                 self.event.push(ChargingMsg::Auth(data_set.auth));
 
                 // set imax configuration
-                AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "imax", data_set.imax, ignore_rsp_cb,ignoreRspCtx{})?;
+                AfbSubCall::call_async(
+                    evt.get_apiv4(),
+                    self.iec_api,
+                    "imax",
+                    data_set.imax,
+                    ignore_rsp_cb,
+                    ignoreRspCtx {},
+                )?;
             }
             Err(_) => {
                 data_set.auth = AuthMsg::Fail;
@@ -185,15 +186,25 @@ impl ManagerHandle {
             }
         };
         state.iso = iso_state;
-    	AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "power", true, ignore_rsp_cb, ignoreRspCtx{})?;
-        self.event.push(ChargingMsg::Iso(iso_state));
-        self.event.push(ChargingMsg::Power(PowerRequest::Start));
-        afb_log_msg!(
-            Notice,
-            self.event,
-            "Slac+Auth done allow power iso_mode:{:?}",
-            iso_state
-        );
+        if matches!(iso_state, IsoState::Iec) {
+            // Only close the contactor if we are in Basic charging mode
+            AfbSubCall::call_async(
+                evt.get_apiv4(),
+                self.iec_api,
+                "power",
+                true,
+                ignore_rsp_cb,
+                ignoreRspCtx {},
+            )?;
+            self.event.push(ChargingMsg::Iso(iso_state));
+            self.event.push(ChargingMsg::Power(PowerRequest::Start));
+            afb_log_msg!(
+                Notice,
+                self.event,
+                "Slac+Auth done allow power iso_mode:{:?}",
+                iso_state
+            );
+        }
         Ok(())
     }
 
@@ -223,9 +234,15 @@ impl ManagerHandle {
                 AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
             }
 
-            OcppMsg::Transaction (status, tid) => {
+            OcppMsg::Transaction(status, tid) => {
                 // new event for re mote stop
-                afb_log_msg!(Warning, evt, "ocpp transaction power:{} received tid:{}", status, tid);
+                afb_log_msg!(
+                    Warning,
+                    evt,
+                    "ocpp transaction power:{} received tid:{}",
+                    status,
+                    tid
+                );
                 let response = AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", *status)?;
                 let data = response.get::<&MeterDataSet>(0)?;
                 AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
@@ -265,7 +282,6 @@ impl ManagerHandle {
         Ok(())
     }
 
-
     // added for OCPP RemoteStopTransaction
     pub fn powerctrl(&self, allow: bool) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
@@ -273,8 +289,7 @@ impl ManagerHandle {
         if allow {
             afb_log_msg!(Notice, None, "function remote power triggered, allow power");
             AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", true)?;
-        }
-        else {
+        } else {
             afb_log_msg!(Notice, None, "function remote power triggered, stop power");
             AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", false)?;
             data_set.power = PowerRequest::Idle;

@@ -240,6 +240,7 @@ pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCf
         config.engy_api,
         config.ocpp_api,
         msg_evt,
+        config.basic_charging_enabled
     );
 
     let state_event = AfbEvent::new("state");

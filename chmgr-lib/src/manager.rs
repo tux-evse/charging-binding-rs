@@ -22,6 +22,8 @@ pub struct ManagerHandle {
     engy_api: &'static str,
     ocpp_api: &'static str,
     event: &'static AfbEvent,
+    // For (iso15118) debugging purpose, basic charging can be disabled
+    basic_charging_enabled: bool,
 }
 
 struct IgnoreRspCtx {}
@@ -40,6 +42,7 @@ impl ManagerHandle {
         engy_api: &'static str,
         ocpp_api: &'static str,
         event: &'static AfbEvent,
+        basic_charging_enabled: bool,
     ) -> &'static mut Self {
         let handle = ManagerHandle {
             apiv4,
@@ -49,6 +52,7 @@ impl ManagerHandle {
             ocpp_api,
             event,
             data_set: Mutex::new(ChargingState::default()),
+            basic_charging_enabled,
         };
 
         // return a static handle to prevent Rust from complaining when moving/sharing it
@@ -177,8 +181,12 @@ impl ManagerHandle {
                 IsoState::Iso3
             }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
-                self.auth_rqt(&mut state, evt)?; // Warning lock data_set
-                IsoState::Iec
+                if self.basic_charging_enabled {
+                    self.auth_rqt(&mut state, evt)?; // Warning lock data_set
+                    IsoState::Iec
+                } else {
+                    return Ok(());
+                }
             }
 
             _ => {

@@ -231,6 +231,15 @@ impl ManagerHandle {
                 AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
                 data_set.power = PowerRequest::Idle;
             }
+            OcppMsg::Authorized(status) => {
+                afb_log_msg!(Warning, evt, "::::::::OCPP Authorization Status: {} ::::::", status);
+                if *status == false {
+                    afb_log_msg!(Notice, evt, "::::::::OCPP Authorization FALSE :::::::::::::");
+                    self.event.push(AuthMsg::Fail);
+                }
+
+                afb_log_msg!(Notice, evt, "::::::::OCPP Authorization Done :::::::::::::");
+            }   
 
             _ => {}
         }

@@ -232,10 +232,11 @@ impl ManagerHandle {
                 data_set.power = PowerRequest::Idle;
             }
             OcppMsg::Authorized(status) => {
-                afb_log_msg!(Warning, evt, "::::::::OCPP Authorization Status: {} ::::::", status);
+                afb_log_msg!(Notice, evt, "::::::::OCPP Authorization Status: {} ::::::", status);
                 if *status == false {
                     afb_log_msg!(Notice, evt, "::::::::OCPP Authorization FALSE :::::::::::::");
-                    self.event.push(AuthMsg::Fail);
+                    data_set.auth = AuthMsg::Fail;
+                    self.event.push(ChargingMsg::Auth(data_set.auth));
                 }
 
                 afb_log_msg!(Notice, evt, "::::::::OCPP Authorization Done :::::::::::::");

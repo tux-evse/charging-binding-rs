@@ -234,14 +234,10 @@ impl ManagerHandle {
             OcppMsg::Authorized(status) => {
                 afb_log_msg!(Notice, evt, "::::::::OCPP Authorization Status: {} ::::::", status);
                 if *status == false {
-                    afb_log_msg!(Notice, evt, "::::::::OCPP Authorization FALSE :::::::::::::");
                     data_set.auth = AuthMsg::Fail;
                     self.event.push(ChargingMsg::Auth(data_set.auth));
                 }
-
-                afb_log_msg!(Notice, evt, "::::::::OCPP Authorization Done :::::::::::::");
             }   
-
             _ => {}
         }
         Ok(())

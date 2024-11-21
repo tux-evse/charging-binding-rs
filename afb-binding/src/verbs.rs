@@ -178,6 +178,24 @@ fn state_request_cb(
     Ok(())
 }
 
+struct PaymentOptionCtx {
+    mgr: &'static ManagerHandle,
+}
+
+fn payment_option_cb(
+    rqt: &AfbRequest,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
+) -> Result<(), AfbError> {
+
+    let ctx = ctx.get_ref::<PaymentOptionCtx>()?;
+    let msg = args.get::<&ChargingMsg>(0)?;
+
+    ctx.mgr.set_payment_option(msg)?;
+    rqt.reply(AFB_NO_DATA, 0);
+    Ok(())
+}
+
 struct ReserveChargerCtx {
     mgr: &'static ManagerHandle,
 }
@@ -240,7 +258,8 @@ pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCf
         config.engy_api,
         config.ocpp_api,
         msg_evt,
-        config.basic_charging_enabled
+        config.basic_charging_enabled,
+        
     );
 
     let state_event = AfbEvent::new("state");
@@ -287,10 +306,18 @@ pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCf
         .set_usage("true|false")
         .finalize()?;
 
+    let payment_option_verb = AfbVerb::new("payment-option")
+        .set_info("selected payment option")
+        .set_callback(payment_option_cb)
+        .set_context(PaymentOptionCtx {
+            mgr: manager
+        })
+        .finalize()?;
+
     let iec_handler = AfbEvtHandler::new("iec-evt")
         .set_pattern(to_static_str(format!("{}/*", config.iec_api)))
         .set_callback(iec_event_cb)
-        .set_context(IecEvtCtx { 
+        .set_context(IecEvtCtx {
             mgr: manager 
         })
         .finalize()?;
@@ -352,8 +379,8 @@ pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCf
     api.add_event(state_event);
     api.add_verb(state_verb);
     api.add_verb(reserve_verb);
-    api.add_verb(subscribe_verb);   
-
+    api.add_verb(subscribe_verb);  
+    api.add_verb(payment_option_verb); 
     api.add_verb(remote_power_verb);
 
     Ok(())

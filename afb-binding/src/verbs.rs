@@ -32,7 +32,7 @@ fn ocpp_event_cb(evt: &AfbEventMsg, args: &AfbRqtData, ctx: &AfbCtxData) -> Resu
     Ok(())
 }
 
-struct ignoreCtx {
+struct IgnoreCtx {
 }
 
 // Fulup TBD handle broadcast energy event
@@ -42,7 +42,7 @@ fn engy_ignore_cb(
     _ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
 
-    let _ctx = _ctx.get_ref::<ignoreCtx>()?;
+    let _ctx = _ctx.get_ref::<IgnoreCtx>()?;
 
     Ok(())
 }
@@ -240,6 +240,7 @@ pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCf
         config.engy_api,
         config.ocpp_api,
         msg_evt,
+        config.basic_charging_enabled
     );
 
     let state_event = AfbEvent::new("state");
@@ -321,7 +322,7 @@ pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCf
     let ignore_handler = AfbEvtHandler::new("over-limit")
         .set_pattern(to_static_str(format!("{}/over-limit", config.engy_api)))
         .set_callback(engy_ignore_cb)
-        .set_context(ignoreCtx {})
+        .set_context(IgnoreCtx {})
         .finalize()?;
 
     let iavail_handler = AfbEvtHandler::new("iavail-evt")
@@ -332,9 +333,6 @@ pub(crate) fn register_verbs(apiv4: AfbApiV4,api: &mut AfbApi, config: BindingCf
         })
         .finalize()?;
 
-    let ctx = RemotePowerData {
-        mgr: manager,
-    };
     let remote_power_verb = AfbVerb::new("remote_power")
         .set_callback(remote_power_callback)
         .set_context(RemotePowerData {

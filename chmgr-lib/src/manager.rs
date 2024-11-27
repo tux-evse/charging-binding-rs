@@ -22,18 +22,14 @@ pub struct ManagerHandle {
     engy_api: &'static str,
     ocpp_api: &'static str,
     event: &'static AfbEvent,
+    // For (iso15118) debugging purpose, basic charging can be disabled
+    basic_charging_enabled: bool,
 }
 
-struct ignoreRspCtx {
-}
+struct IgnoreRspCtx {}
 
-fn ignore_rsp_cb(
-    _api: &AfbApi, 
-    _args: &AfbRqtData,
-    _ctx: &AfbCtxData,
-) -> Result<(), AfbError> {
-
-    let _ctx = _ctx.get_ref::<ignoreRspCtx>()?;
+fn ignore_rsp_cb(_api: &AfbApi, _args: &AfbRqtData, _ctx: &AfbCtxData) -> Result<(), AfbError> {
+    let _ctx = _ctx.get_ref::<IgnoreRspCtx>()?;
 
     Ok(())
 }
@@ -46,6 +42,7 @@ impl ManagerHandle {
         engy_api: &'static str,
         ocpp_api: &'static str,
         event: &'static AfbEvent,
+        basic_charging_enabled: bool,
     ) -> &'static mut Self {
         let handle = ManagerHandle {
             apiv4,
@@ -55,6 +52,7 @@ impl ManagerHandle {
             ocpp_api,
             event,
             data_set: Mutex::new(ChargingState::default()),
+            basic_charging_enabled,
         };
 
         // return a static handle to prevent Rust from complaining when moving/sharing it
@@ -153,7 +151,14 @@ impl ManagerHandle {
                 self.event.push(ChargingMsg::Auth(data_set.auth));
 
                 // set imax configuration
-                AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "imax", data_set.imax, ignore_rsp_cb,ignoreRspCtx{})?;
+                AfbSubCall::call_async(
+                    evt.get_apiv4(),
+                    self.iec_api,
+                    "imax",
+                    data_set.imax,
+                    ignore_rsp_cb,
+                    IgnoreRspCtx {},
+                )?;
             }
             Err(_) => {
                 data_set.auth = AuthMsg::Fail;
@@ -176,8 +181,12 @@ impl ManagerHandle {
                 IsoState::Iso3
             }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
-                self.auth_rqt(&mut state, evt)?; // Warning lock data_set
-                IsoState::Iec
+                if self.basic_charging_enabled {
+                    self.auth_rqt(&mut state, evt)?; // Warning lock data_set
+                    IsoState::Iec
+                } else {
+                    return Ok(());
+                }
             }
 
             _ => {
@@ -185,15 +194,25 @@ impl ManagerHandle {
             }
         };
         state.iso = iso_state;
-    	AfbSubCall::call_async(evt.get_apiv4(), self.iec_api, "power", true, ignore_rsp_cb, ignoreRspCtx{})?;
-        self.event.push(ChargingMsg::Iso(iso_state));
-        self.event.push(ChargingMsg::Power(PowerRequest::Start));
-        afb_log_msg!(
-            Notice,
-            self.event,
-            "Slac+Auth done allow power iso_mode:{:?}",
-            iso_state
-        );
+        if matches!(iso_state, IsoState::Iec) {
+            // Only close the contactor if we are in Basic charging mode
+            AfbSubCall::call_async(
+                evt.get_apiv4(),
+                self.iec_api,
+                "power",
+                true,
+                ignore_rsp_cb,
+                IgnoreRspCtx {},
+            )?;
+            self.event.push(ChargingMsg::Iso(iso_state));
+            self.event.push(ChargingMsg::Power(PowerRequest::Start));
+            afb_log_msg!(
+                Notice,
+                self.event,
+                "Slac+Auth done allow power iso_mode:{:?}",
+                iso_state
+            );
+        }
         Ok(())
     }
 
@@ -223,9 +242,15 @@ impl ManagerHandle {
                 AfbSubCall::call_sync(evt.get_api(), self.iec_api, "power", false)?;
             }
 
-            OcppMsg::Transaction (status, tid) => {
+            OcppMsg::Transaction(status, tid) => {
                 // new event for re mote stop
-                afb_log_msg!(Warning, evt, "ocpp transaction power:{} received tid:{}", status, tid);
+                afb_log_msg!(
+                    Warning,
+                    evt,
+                    "ocpp transaction power:{} received tid:{}",
+                    status,
+                    tid
+                );
                 let response = AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", *status)?;
                 let data = response.get::<&MeterDataSet>(0)?;
                 AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
@@ -265,7 +290,6 @@ impl ManagerHandle {
         Ok(())
     }
 
-
     // added for OCPP RemoteStopTransaction
     pub fn powerctrl(&self, allow: bool) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
@@ -273,8 +297,7 @@ impl ManagerHandle {
         if allow {
             afb_log_msg!(Notice, None, "function remote power triggered, allow power");
             AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", true)?;
-        }
-        else {
+        } else {
             afb_log_msg!(Notice, None, "function remote power triggered, stop power");
             AfbSubCall::call_sync(self.apiv4, self.iec_api, "power", false)?;
             data_set.power = PowerRequest::Idle;
@@ -295,7 +318,7 @@ impl ManagerHandle {
                     } else {
                         // C => B
 
-                        data_set.plugged = PlugState::PlugOut;
+                        data_set.plugged = PlugState::PlugIn;
                     }
                     data_set.plugged
                 };
@@ -350,14 +373,14 @@ impl ManagerHandle {
                 let data = response.get::<&MeterDataSet>(0)?;
 
                 let plug_state = if *value {
-                    data_set.plugged = PlugState::Lock;
+                    data_set.plugged = PlugState::PlugIn;
                     AfbSubCall::call_sync(
                         evt.get_apiv4(),
                         self.ocpp_api,
                         "status-notification",
                         OcppChargerStatus::Reserved,
                     )?;
-                    PlugState::Lock
+                    PlugState::PlugIn
                 } else {
                     afb_log_msg!(
                         Debug,

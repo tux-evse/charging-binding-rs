@@ -22,6 +22,7 @@ pub struct BindingCfg {
     pub ocpp_api: &'static str,
     pub tic: u32,
     pub limit: u32,
+    pub basic_charging_enabled: bool,
 }
 
 pub struct ApiUserData {
@@ -99,6 +100,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         ocpp_api,
         tic,
         limit,
+        basic_charging_enabled: jconf.default("basic_charging_enabled", true)?,
     };
 
     // create backend API
@@ -121,7 +123,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     };
 
     if let Ok(value) = jconf.get::<i32>("verbosity") {
-        api.set_verbosity(value);
+        api.set_verbosity(value)?;
     };
 
     register_verbs(rootv4, api, config)?;

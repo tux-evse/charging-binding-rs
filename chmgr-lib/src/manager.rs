@@ -20,7 +20,7 @@ pub struct ManagerHandle {
     auth_api: &'static str,
     iec_api: &'static str,
     engy_api: &'static str,
-    ocpp_api: &'static str,
+    ocpp_api: Option<&'static str>,
     event: &'static AfbEvent,
     // For (iso15118) debugging purpose, basic charging can be disabled
     basic_charging_enabled: bool,
@@ -40,7 +40,7 @@ impl ManagerHandle {
         auth_api: &'static str,
         iec_api: &'static str,
         engy_api: &'static str,
-        ocpp_api: &'static str,
+        ocpp_api: Option<&'static str>,
         event: &'static AfbEvent,
         basic_charging_enabled: bool,
     ) -> &'static mut Self {
@@ -375,12 +375,14 @@ impl ManagerHandle {
                     data_set.power = PowerRequest::Charging(data_set.imax);
                     self.charging_protocol(&data_set)?;
                     AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
-                    AfbSubCall::call_sync(
-                        evt.get_apiv4(),
-                        self.ocpp_api,
-                        "status-notification",
-                        OcppChargerStatus::Charging,
-                    )?;
+                    if self.ocpp_api.is_some() {
+                        AfbSubCall::call_sync(
+                            evt.get_apiv4(),
+                            self.ocpp_api.unwrap(),
+                            "status-notification",
+                            OcppChargerStatus::Charging,
+                        )?;
+                    }
                 } else {
                     // vehicle stop charging
                     let response = AfbSubCall::call_sync(
@@ -407,12 +409,14 @@ impl ManagerHandle {
 
                 let plug_state = if *value {
                     data_set.plugged = PlugState::PlugIn;
-                    AfbSubCall::call_sync(
-                        evt.get_apiv4(),
-                        self.ocpp_api,
-                        "status-notification",
-                        OcppChargerStatus::Reserved,
-                    )?;
+                    if self.ocpp_api.is_some() {
+                        AfbSubCall::call_sync(
+                            evt.get_apiv4(),
+                            self.ocpp_api.unwrap(),
+                            "status-notification",
+                            OcppChargerStatus::Reserved,
+                        )?;
+                    }
                     PlugState::PlugIn
                 } else {
                     afb_log_msg!(

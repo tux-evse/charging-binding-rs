@@ -19,7 +19,7 @@ pub struct BindingCfg {
     pub slac_api: &'static str,
     pub auth_api: &'static str,
     pub engy_api: &'static str,
-    pub ocpp_api: &'static str,
+    pub ocpp_api: Option<&'static str>,
     pub tic: u32,
     pub limit: u32,
     pub basic_charging_enabled: bool,
@@ -29,7 +29,7 @@ pub struct ApiUserData {
     pub iec_api: &'static str,
     pub slac_api: &'static str,
     pub engy_api: &'static str,
-    pub ocpp_api: &'static str,
+    pub ocpp_api: Option<&'static str>,
 }
 
 impl AfbApiControls for ApiUserData {
@@ -37,7 +37,9 @@ impl AfbApiControls for ApiUserData {
     fn start(&mut self, api: &AfbApi) -> Result<(), AfbError> {
         AfbSubCall::call_sync(api, self.iec_api, "subscribe", true)?;
         AfbSubCall::call_sync(api, self.slac_api, "subscribe", true)?;
-        AfbSubCall::call_sync(api, self.ocpp_api, "subscribe", true)?;
+        if self.ocpp_api.is_some() {
+            AfbSubCall::call_sync(api, self.ocpp_api.unwrap(), "subscribe", true)?;
+        }
         AfbSubCall::call_sync(api, self.engy_api, "iavail", EnergyAction::SUBSCRIBE)?;
         AfbSubCall::call_sync(api, self.engy_api, "iover", EnergyAction::SUBSCRIBE)?;
         Ok(())
@@ -90,7 +92,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     let slac_api = jconf.get::<&'static str>("slac_api")?;
     let auth_api = jconf.get::<&'static str>("auth_api")?;
     let engy_api = jconf.get::<&'static str>("energy_api")?;
-    let ocpp_api = jconf.get::<&'static str>("ocpp_api")?;
+    let ocpp_api = jconf.optional::<&'static str>("ocpp_api")?;
     let tic = jconf.default::<u32>("tic", 0)?;
     let config = BindingCfg {
         iec_api,
@@ -109,9 +111,12 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
         .require_api(iec_api)
         .require_api(slac_api)
         .require_api(engy_api)
-        .require_api(auth_api)
-        .require_api(ocpp_api)
-        .set_callback(Box::new(ApiUserData {
+        .require_api(auth_api);
+
+    if ocpp_api.is_some() {
+        api.require_api(ocpp_api.unwrap());
+    }
+        api.set_callback(Box::new(ApiUserData {
             iec_api,
             slac_api,
             engy_api,

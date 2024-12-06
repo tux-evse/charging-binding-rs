@@ -150,15 +150,17 @@ impl ManagerHandle {
                 data_set.pmax = engy_conf.pmax as u32;
                 self.event.push(ChargingMsg::Auth(data_set.auth));
 
-                // set imax configuration
-                AfbSubCall::call_async(
-                    evt.get_apiv4(),
-                    self.iec_api,
-                    "imax",
-                    data_set.imax,
-                    ignore_rsp_cb,
-                    IgnoreRspCtx {},
-                )?;
+                if matches!(data_set.iso, IsoState::Iec) {
+                    // set imax configuration
+                    AfbSubCall::call_async(
+                        evt.get_apiv4(),
+                        self.iec_api,
+                        "imax",
+                        data_set.imax,
+                        ignore_rsp_cb,
+                        IgnoreRspCtx {},
+                    )?;
+                }
             }
             Err(_) => {
                 data_set.auth = AuthMsg::Fail;
@@ -172,12 +174,10 @@ impl ManagerHandle {
         afb_log_msg!(Notice, self.event, "Valid idp-auth");
         Ok(())
     }
-    
 
     pub fn set_payment_option(&self, msg: &ChargingMsg) -> Result<(), AfbError> {
-
         let mut data_set = self.get_state()?;
-        
+
         if let ChargingMsg::Payment(payment_option) = msg {
             data_set.payment = Some(*payment_option);
         }
@@ -185,25 +185,22 @@ impl ManagerHandle {
         Ok(())
     }
 
-    fn charging_protocol(&self, data_set: &MutexGuard<ChargingState>) -> Result<(), AfbError>{
-
+    fn charging_protocol(&self, data_set: &MutexGuard<ChargingState>) -> Result<(), AfbError> {
         let charging_type = match data_set.payment {
             Some(PaymentOption::Pnc) => ChargingProtocol::PlugAndCharge,
             Some(PaymentOption::Eim) => ChargingProtocol::SmartCharge,
-            _ => {
-                match data_set.iso {
-                    IsoState::Iec => ChargingProtocol::BasicCharge,
-                    _ => {
-                        afb_log_msg!(Warning, self.event, "Invalid charging protocol.");
-                        return Ok(());
-                    }
-                }    
-            }
-        }; 
+            _ => match data_set.iso {
+                IsoState::Iec => ChargingProtocol::BasicCharge,
+                _ => {
+                    afb_log_msg!(Warning, self.event, "Invalid charging protocol.");
+                    return Ok(());
+                }
+            },
+        };
         self.event.push(ChargingMsg::Protocol(charging_type));
         Ok(())
     }
-    
+
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
         let mut state = self.get_state()?;
         let iso_state = match msg {
@@ -225,6 +222,8 @@ impl ManagerHandle {
             }
         };
         state.iso = iso_state;
+        self.event.push(ChargingMsg::Iso(iso_state));
+
         if matches!(iso_state, IsoState::Iec) {
             // Only close the contactor if we are in Basic charging mode
             AfbSubCall::call_async(
@@ -235,7 +234,6 @@ impl ManagerHandle {
                 ignore_rsp_cb,
                 IgnoreRspCtx {},
             )?;
-            self.event.push(ChargingMsg::Iso(iso_state));
             self.event.push(ChargingMsg::Power(PowerRequest::Start));
             afb_log_msg!(
                 Notice,
@@ -253,7 +251,7 @@ impl ManagerHandle {
             OcppMsg::PowerLimit(limit) => {
                 // in current implementation over-current
                 afb_log_msg!(Warning, evt, "ocpp set power limit:{}", limit.imax);
-                if limit.imax < data_set.imax as i32 {
+                if limit.imax < data_set.imax as i32 && matches!(data_set.iso, IsoState::Iec) {
                     AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", limit.imax)?;
                 }
             }
@@ -313,7 +311,9 @@ impl ManagerHandle {
 
         if let PowerRequest::Charging(current) = data_set.power {
             if current > imax {
-                AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", imax)?;
+                if matches!(data_set.iso, IsoState::Iec) {
+                    AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", imax)?;
+                }
                 self.event
                     .push(ChargingMsg::Power(PowerRequest::Charging(imax)));
                 self.charging_protocol(&data_set)?;
@@ -374,7 +374,15 @@ impl ManagerHandle {
                     // vehicle start charging
                     data_set.power = PowerRequest::Charging(data_set.imax);
                     self.charging_protocol(&data_set)?;
-                    AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
+
+                    if matches!(data_set.iso, IsoState::Iec) {
+                        AfbSubCall::call_sync(
+                            evt.get_apiv4(),
+                            self.iec_api,
+                            "imax",
+                            data_set.imax,
+                        )?;
+                    }
                     if self.ocpp_api.is_some() {
                         AfbSubCall::call_sync(
                             evt.get_apiv4(),

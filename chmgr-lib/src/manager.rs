@@ -172,7 +172,38 @@ impl ManagerHandle {
         afb_log_msg!(Notice, self.event, "Valid idp-auth");
         Ok(())
     }
+    
 
+    pub fn set_payment_option(&self, msg: &ChargingMsg) -> Result<(), AfbError> {
+
+        let mut data_set = self.get_state()?;
+        
+        if let ChargingMsg::Payment(payment_option) = msg {
+            data_set.payment = Some(*payment_option);
+        }
+
+        Ok(())
+    }
+
+    fn charging_protocol(&self, data_set: &MutexGuard<ChargingState>) -> Result<(), AfbError>{
+
+        let charging_type = match data_set.payment {
+            Some(PaymentOption::Pnc) => ChargingProtocol::PlugAndCharge,
+            Some(PaymentOption::Eim) => ChargingProtocol::SmartCharge,
+            _ => {
+                match data_set.iso {
+                    IsoState::Iec => ChargingProtocol::BasicCharge,
+                    _ => {
+                        afb_log_msg!(Warning, self.event, "Invalid charging protocol.");
+                        return Ok(());
+                    }
+                }    
+            }
+        }; 
+        self.event.push(ChargingMsg::Protocol(charging_type));
+        Ok(())
+    }
+    
     pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
         let mut state = self.get_state()?;
         let iso_state = match msg {
@@ -285,6 +316,7 @@ impl ManagerHandle {
                 AfbSubCall::call_sync(evt.get_api(), self.iec_api, "imax", imax)?;
                 self.event
                     .push(ChargingMsg::Power(PowerRequest::Charging(imax)));
+                self.charging_protocol(&data_set)?;
             }
         }
         Ok(())
@@ -341,6 +373,7 @@ impl ManagerHandle {
                 if *value {
                     // vehicle start charging
                     data_set.power = PowerRequest::Charging(data_set.imax);
+                    self.charging_protocol(&data_set)?;
                     AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "imax", data_set.imax)?;
                     if self.ocpp_api.is_some() {
                         AfbSubCall::call_sync(

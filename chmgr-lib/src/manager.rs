@@ -198,6 +198,7 @@ impl ManagerHandle {
                 }
             },
         };
+        afb_log_msg!(Notice, None, "TESTOOO:::::AFTER::::payment");
         self.event.push(ChargingMsg::Protocol(charging_type));
         data_set.payment = None;
         afb_log_msg!(Notice, None, "TESTOOO:::::END::::charging_protocol");

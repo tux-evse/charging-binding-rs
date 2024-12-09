@@ -186,7 +186,7 @@ impl ManagerHandle {
     }
 
     fn charging_protocol(&self, data_set: &mut MutexGuard<ChargingState>) -> Result<(), AfbError> {
-
+        afb_log_msg!(Notice, None, "TESTOOO:::::INSIDE::::charging_protocol");
         let charging_type = match data_set.payment {
             Some(PaymentOption::Pnc) => ChargingProtocol::PlugAndCharge,
             Some(PaymentOption::Eim) => ChargingProtocol::SmartCharge,
@@ -198,7 +198,6 @@ impl ManagerHandle {
                 }
             },
         };
-        afb_log_msg!(Notice, None, "TESTOOO:::::charging_type: {:?}", charging_type);
         self.event.push(ChargingMsg::Protocol(charging_type));
         data_set.payment = None;
         afb_log_msg!(Notice, None, "TESTOOO:::::END::::charging_protocol");

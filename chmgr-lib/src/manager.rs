@@ -185,7 +185,7 @@ impl ManagerHandle {
         Ok(())
     }
 
-    fn charging_protocol(&self, data_set: &MutexGuard<ChargingState>) -> Result<(), AfbError> {
+    fn charging_protocol(&self, data_set: &mut MutexGuard<ChargingState>) -> Result<(), AfbError> {
         let charging_type = match data_set.payment {
             Some(PaymentOption::Pnc) => ChargingProtocol::PlugAndCharge,
             Some(PaymentOption::Eim) => ChargingProtocol::SmartCharge,
@@ -198,6 +198,7 @@ impl ManagerHandle {
             },
         };
         self.event.push(ChargingMsg::Protocol(charging_type));
+        data_set.payment = None;
         Ok(())
     }
 
@@ -307,7 +308,7 @@ impl ManagerHandle {
     }
 
     pub fn engy_imax(&self, evt: &AfbEventMsg, imax: u32) -> Result<(), AfbError> {
-        let data_set = self.get_state()?;
+        let mut data_set = self.get_state()?;
 
         if let PowerRequest::Charging(current) = data_set.power {
             if current > imax {
@@ -316,7 +317,7 @@ impl ManagerHandle {
                 }
                 self.event
                     .push(ChargingMsg::Power(PowerRequest::Charging(imax)));
-                self.charging_protocol(&data_set)?;
+                self.charging_protocol(&mut data_set)?;
             }
         }
         Ok(())
@@ -373,7 +374,7 @@ impl ManagerHandle {
                 if *value {
                     // vehicle start charging
                     data_set.power = PowerRequest::Charging(data_set.imax);
-                    self.charging_protocol(&data_set)?;
+                    self.charging_protocol(&mut data_set)?;
 
                     if matches!(data_set.iso, IsoState::Iec) {
                         AfbSubCall::call_sync(

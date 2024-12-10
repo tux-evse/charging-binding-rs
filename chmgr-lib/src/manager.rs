@@ -348,14 +348,16 @@ impl ManagerHandle {
                     if *value {
                         // B => C
                         data_set.plugged = PlugState::Lock;
+                        
+                        self.event.push(ChargingMsg::Plugged(status));
+
                     } else {
                         // C => B
 
                         data_set.plugged = PlugState::PlugIn;
                     }
                     data_set.plugged
-                };
-                self.event.push(ChargingMsg::Plugged(status));
+                };         
             }
             Iec6185Msg::CableImax(value) => {
                 afb_log_msg!(
@@ -426,7 +428,9 @@ impl ManagerHandle {
                             OcppChargerStatus::Reserved,
                         )?;
                     }
-                    PlugState::PlugIn
+                    if plug_state == PlugState::PlugIn {
+                        return Ok(());
+                    }   
                 } else {
                     afb_log_msg!(
                         Debug,

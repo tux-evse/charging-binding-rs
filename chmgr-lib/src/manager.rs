@@ -348,8 +348,8 @@ impl ManagerHandle {
                     if *value {
                         // B => C
                         data_set.plugged = PlugState::Lock;
-                        
-                        self.event.push(ChargingMsg::Plugged(status));
+
+                        self.event.push(ChargingMsg::Plugged(data_set.plugged));
 
                     } else {
                         // C => B
@@ -419,6 +419,12 @@ impl ManagerHandle {
                 let data = response.get::<&MeterDataSet>(0)?;
 
                 let plug_state = if *value {
+                    match data_set.plugged {
+                        PlugState::PlugIn => {
+                        return Ok(());
+                        }
+                        _ => {}
+                    }
                     data_set.plugged = PlugState::PlugIn;
                     if self.ocpp_api.is_some() {
                         AfbSubCall::call_sync(
@@ -428,9 +434,7 @@ impl ManagerHandle {
                             OcppChargerStatus::Reserved,
                         )?;
                     }
-                    if plug_state == PlugState::PlugIn {
-                        return Ok(());
-                    }   
+                    PlugState::PlugIn
                 } else {
                     afb_log_msg!(
                         Debug,

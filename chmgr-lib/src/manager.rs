@@ -344,18 +344,14 @@ impl ManagerHandle {
         match msg {
             Iec6185Msg::PowerRqt(value) => {
                 afb_log_msg!(Notice, self.event, "eic power-request value:{}", value);
-                let status = {
-                    if *value {
-                        // B => C
-                        data_set.plugged = PlugState::Lock;
-                    } else {
-                        // C => B
-
-                        data_set.plugged = PlugState::PlugIn;
-                    }
-                    data_set.plugged
-                };
-                self.event.push(ChargingMsg::Plugged(status));
+                if *value {
+                    // B => C
+                    data_set.plugged = PlugState::Lock;
+                    self.event.push(ChargingMsg::Plugged(data_set.plugged));
+                } else {
+                    // C => B
+                    data_set.plugged = PlugState::PlugIn;
+                }      
             }
             Iec6185Msg::CableImax(value) => {
                 afb_log_msg!(
@@ -417,7 +413,6 @@ impl ManagerHandle {
                 let data = response.get::<&MeterDataSet>(0)?;
 
                 let plug_state = if *value {
-                    data_set.plugged = PlugState::PlugIn;
                     if self.ocpp_api.is_some() {
                         AfbSubCall::call_sync(
                             evt.get_apiv4(),
@@ -425,6 +420,14 @@ impl ManagerHandle {
                             "status-notification",
                             OcppChargerStatus::Reserved,
                         )?;
+                    }
+                    match data_set.plugged {
+                        PlugState::PlugIn => {
+                            return Ok(());
+                        }
+                        _ => {
+                            data_set.plugged = PlugState::PlugIn;
+                        }
                     }
                     PlugState::PlugIn
                 } else {

@@ -16,7 +16,7 @@ use typesv4::prelude::*;
 
 pub struct BindingCfg {
     pub iec_api: &'static str,
-    pub slac_api: &'static str,
+    pub slac_api: Option<&'static str>,
     pub auth_api: &'static str,
     pub engy_api: &'static str,
     pub ocpp_api: Option<&'static str>,
@@ -27,7 +27,7 @@ pub struct BindingCfg {
 
 pub struct ApiUserData {
     pub iec_api: &'static str,
-    pub slac_api: &'static str,
+    pub slac_api: Option<&'static str>,
     pub engy_api: &'static str,
     pub ocpp_api: Option<&'static str>,
 }
@@ -36,7 +36,9 @@ impl AfbApiControls for ApiUserData {
     // the API is created and ready. At this level user may subcall api(s) declare as dependencies
     fn start(&mut self, api: &AfbApi) -> Result<(), AfbError> {
         AfbSubCall::call_sync(api, self.iec_api, "subscribe", true)?;
-        AfbSubCall::call_sync(api, self.slac_api, "subscribe", true)?;
+        if self.slac_api.is_some() {
+            AfbSubCall::call_sync(api, self.slac_api.unwrap(), "subscribe", true)?;
+        }
         if self.ocpp_api.is_some() {
             AfbSubCall::call_sync(api, self.ocpp_api.unwrap(), "subscribe", true)?;
         }
@@ -89,7 +91,7 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     };
 
     let iec_api = jconf.get::<&'static str>("iec_api")?;
-    let slac_api = jconf.get::<&'static str>("slac_api")?;
+    let slac_api = jconf.optional::<&'static str>("slac_api")?;
     let auth_api = jconf.get::<&'static str>("auth_api")?;
     let engy_api = jconf.get::<&'static str>("energy_api")?;
     let ocpp_api = jconf.optional::<&'static str>("ocpp_api")?;
@@ -109,19 +111,22 @@ pub fn binding_init(rootv4: AfbApiV4, jconf: JsoncObj) -> Result<&'static AfbApi
     let api = AfbApi::new(api)
         .set_info(info)
         .require_api(iec_api)
-        .require_api(slac_api)
         .require_api(engy_api)
         .require_api(auth_api);
+
+    if slac_api.is_some() {
+        api.require_api(slac_api.unwrap());
+    }
 
     if ocpp_api.is_some() {
         api.require_api(ocpp_api.unwrap());
     }
-        api.set_callback(Box::new(ApiUserData {
-            iec_api,
-            slac_api,
-            engy_api,
-            ocpp_api,
-        }));
+    api.set_callback(Box::new(ApiUserData {
+        iec_api,
+        slac_api,
+        engy_api,
+        ocpp_api,
+    }));
 
     if let Ok(value) = jconf.get::<String>("permission") {
         api.set_permission(AfbPermission::new(to_static_str(value)));

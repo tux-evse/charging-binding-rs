@@ -87,8 +87,22 @@ fn slac_event_cb(evt: &AfbEventMsg, args: &AfbRqtData, ctx: &AfbCtxData) -> Resu
 
     // forward slac events to potential listeners
     afb_log_msg!(Debug, evt, "slac_evt:{:?}", msg);
-    ctx.mgr.slac(evt, msg)?;
+    ctx.mgr.slac(evt.get_apiv4(), msg)?;
 
+    Ok(())
+}
+
+fn on_set_slac_status(
+    rqt: &AfbRequest,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
+) -> Result<(), AfbError> {
+    let ctx = ctx.get_ref::<SlacEvtCtx>()?;
+    let msg = args.get::<&SlacStatus>(0)?;
+
+    afb_log_msg!(Debug, rqt, "set_slac_state:{:?}", msg);
+    ctx.mgr.slac(rqt.get_apiv4(), msg)?;
+    rqt.reply(AFB_NO_DATA, 0);
     Ok(())
 }
 
@@ -166,7 +180,6 @@ fn payment_option_cb(
     args: &AfbRqtData,
     ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
-
     let ctx = ctx.get_ref::<PaymentOptionCtx>()?;
     let msg = args.get::<&ChargingMsg>(0)?;
 
@@ -284,21 +297,19 @@ pub(crate) fn register_verbs(
     let payment_option_verb = AfbVerb::new("payment-option")
         .set_info("selected payment option")
         .set_callback(payment_option_cb)
-        .set_context(PaymentOptionCtx {
-            mgr: manager
-        })
+        .set_context(PaymentOptionCtx { mgr: manager })
+        .finalize()?;
+
+    let set_slac_state_verb = AfbVerb::new("set_slac_status")
+        .set_info("Set SLAC Status")
+        .set_callback(on_set_slac_status)
+        .set_context(SlacEvtCtx { mgr: manager })
         .finalize()?;
 
     let iec_handler = AfbEvtHandler::new("iec-evt")
         .set_pattern(to_static_str(format!("{}/*", config.iec_api)))
         .set_callback(iec_event_cb)
-        .set_context(IecEvtCtx {mgr: manager})
-        .finalize()?;
-
-    let slac_handler = AfbEvtHandler::new("slac-evt")
-        .set_pattern(to_static_str(format!("{}/*", config.slac_api)))
-        .set_callback(slac_event_cb)
-        .set_context(SlacEvtCtx { mgr: manager })
+        .set_context(IecEvtCtx { mgr: manager })
         .finalize()?;
 
     let iover_handler = AfbEvtHandler::new("iover-evt")
@@ -329,7 +340,6 @@ pub(crate) fn register_verbs(
     api.add_evt_handler(iover_handler);
     api.add_evt_handler(iavail_handler);
     api.add_evt_handler(iec_handler);
-    api.add_evt_handler(slac_handler);
     api.add_evt_handler(ignore_handler);
 
     if config.ocpp_api.is_some() {
@@ -341,13 +351,23 @@ pub(crate) fn register_verbs(
 
         api.add_evt_handler(ocpp_handler);
     }
+
+    if config.slac_api.is_some() {
+        let slac_handler = AfbEvtHandler::new("slac-evt")
+            .set_pattern(to_static_str(format!("{}/*", config.slac_api.unwrap())))
+            .set_callback(slac_event_cb)
+            .set_context(SlacEvtCtx { mgr: manager })
+            .finalize()?;
+        api.add_evt_handler(slac_handler);
+    }
     api.add_event(msg_evt);
     api.add_event(state_event);
     api.add_verb(state_verb);
     api.add_verb(reserve_verb);
-    api.add_verb(subscribe_verb);  
-    api.add_verb(payment_option_verb); 
+    api.add_verb(subscribe_verb);
+    api.add_verb(payment_option_verb);
     api.add_verb(remote_power_verb);
+    api.add_verb(set_slac_state_verb);
 
     Ok(())
 }

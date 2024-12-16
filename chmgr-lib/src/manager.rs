@@ -124,19 +124,19 @@ impl ManagerHandle {
     fn auth_rqt(
         &self,
         data_set: &mut MutexGuard<ChargingState>,
-        evt: &AfbEventMsg,
+        api: AfbApiV4,
     ) -> Result<(), AfbError> {
         afb_log_msg!(Notice, self.event, "Requesting idp-login");
         data_set.auth = AuthMsg::Pending;
         self.event.push(ChargingMsg::Auth(data_set.auth));
 
-        match AfbSubCall::call_sync(evt.get_apiv4(), self.auth_api, "login", AFB_NO_DATA) {
+        match AfbSubCall::call_sync(api, self.auth_api, "login", AFB_NO_DATA) {
             Ok(response) => {
                 let contract = response.get::<&AuthState>(0)?;
                 data_set.auth = contract.auth;
 
                 let response = AfbSubCall::call_sync(
-                    evt.get_apiv4(),
+                    api,
                     self.engy_api,
                     "config",
                     EngyConfSet {
@@ -153,7 +153,7 @@ impl ManagerHandle {
                 if matches!(data_set.iso, IsoState::Iec) {
                     // set imax configuration
                     AfbSubCall::call_async(
-                        evt.get_apiv4(),
+                        api,
                         self.iec_api,
                         "imax",
                         data_set.imax,
@@ -165,7 +165,7 @@ impl ManagerHandle {
             Err(_) => {
                 data_set.auth = AuthMsg::Fail;
                 self.event.push(ChargingMsg::Auth(data_set.auth));
-                AfbSubCall::call_sync(evt.get_apiv4(), self.iec_api, "power", false)?;
+                AfbSubCall::call_sync(api, self.iec_api, "power", false)?;
                 return afb_error!("charg-iec-auth", "fail idp authentication");
             }
         }
@@ -202,7 +202,7 @@ impl ManagerHandle {
         Ok(())
     }
 
-    pub fn slac(&self, evt: &AfbEventMsg, msg: &SlacStatus) -> Result<(), AfbError> {
+    pub fn slac(&self, api: AfbApiV4, msg: &SlacStatus) -> Result<(), AfbError> {
         let mut state = self.get_state()?;
         let iso_state = match msg {
             SlacStatus::MATCHED => {
@@ -211,7 +211,7 @@ impl ManagerHandle {
             }
             SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
                 if self.basic_charging_enabled {
-                    self.auth_rqt(&mut state, evt)?; // Warning lock data_set
+                    self.auth_rqt(&mut state, api)?; // Warning lock data_set
                     IsoState::Iec
                 } else {
                     return Ok(());
@@ -228,7 +228,7 @@ impl ManagerHandle {
         if matches!(iso_state, IsoState::Iec) {
             // Only close the contactor if we are in Basic charging mode
             AfbSubCall::call_async(
-                evt.get_apiv4(),
+                api,
                 self.iec_api,
                 "power",
                 true,

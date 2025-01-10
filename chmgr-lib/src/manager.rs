@@ -209,7 +209,7 @@ impl ManagerHandle {
                 /* start ISO15118 Fulup TBD should set imax */
                 IsoState::Iso3
             }
-            SlacStatus::UNMATCHED | SlacStatus::TIMEOUT => {
+            SlacStatus::TIMEOUT => {
                 if self.basic_charging_enabled {
                     self.auth_rqt(&mut state, api)?; // Warning lock data_set
                     IsoState::Iec

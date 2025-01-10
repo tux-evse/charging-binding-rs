@@ -226,7 +226,7 @@ impl ManagerHandle {
         self.event.push(ChargingMsg::Iso(iso_state));
 
         if matches!(iso_state, IsoState::Iec) {
-            // Only close the contactor if we are in Basic charging mode
+            // Only close the contactor if we are in Basic Charging mode
             AfbSubCall::call_async(
                 api,
                 self.iec_api,
@@ -351,7 +351,7 @@ impl ManagerHandle {
                 } else {
                     // C => B
                     data_set.plugged = PlugState::PlugIn;
-                }      
+                }
             }
             Iec6185Msg::CableImax(value) => {
                 afb_log_msg!(
@@ -444,7 +444,12 @@ impl ManagerHandle {
                         data_set.power
                     };
                     self.event.push(ChargingMsg::Power(power));
-                    AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)?;
+                    if let Err(err) =
+                        AfbSubCall::call_sync(evt.get_api(), self.auth_api, "logout", data.total)
+                    {
+                        // log error but do not return
+                        afb_log_msg!(Error, self.event, err.get_info());
+                    }
                     PlugState::PlugOut
                 };
                 self.event.push(ChargingMsg::Plugged(plug_state));

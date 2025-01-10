@@ -226,7 +226,7 @@ impl ManagerHandle {
         self.event.push(ChargingMsg::Iso(iso_state));
 
         if matches!(iso_state, IsoState::Iec) {
-            // Only close the contactor if we are in Basic charging mode
+            // Only close the contactor if we are in Basic Charging mode
             AfbSubCall::call_async(
                 api,
                 self.iec_api,

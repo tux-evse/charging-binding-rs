@@ -14,6 +14,9 @@ typesv4= {path ="../afb-types"}
 bindgen    = ">=0.69"
 cc = "1"
 
+[features]
+debug = []
+
 [lib]
 name = "charging"
 crate-type = ["lib"]

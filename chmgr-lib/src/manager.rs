@@ -339,7 +339,7 @@ impl ManagerHandle {
         Ok(())
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debug")]
     pub fn set_plug_state(&self, plug_state: PlugState) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
         data_set.plugged = plug_state;
@@ -347,7 +347,7 @@ impl ManagerHandle {
         Ok(())
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "debug")]
     pub fn set_power_request_state(&self, state: PowerRequest) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
         data_set.power = state;

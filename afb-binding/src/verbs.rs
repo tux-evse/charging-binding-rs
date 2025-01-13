@@ -434,11 +434,6 @@ pub(crate) fn register_verbs(
         dbg_group.add_verb(set_plug_state_verb);
         dbg_group.add_verb(set_power_request_state_verb);
         api.add_group(dbg_group);
-
-        let m = PowerRequest::Start;
-        println!("== {}", serde_json::to_string(&m).unwrap());
-        let m = PowerRequest::Charging(32);
-        println!("== {}", serde_json::to_string(&m).unwrap());
     }
     Ok(())
 }

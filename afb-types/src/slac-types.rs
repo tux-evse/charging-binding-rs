@@ -9,12 +9,12 @@
  *   http://www.apache.org/licenses/LICENSE-2.0
  *
  */
-use serde::{Deserialize, Serialize};
 use afbv4::prelude::*;
+use serde::{Deserialize, Serialize};
 
 AfbDataConverter!(slac_status, SlacStatus);
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "lowercase", untagged)]
+#[serde(rename_all = "lowercase")]
 // Session state extracted from Switch/PySlac code
 pub enum SlacStatus {
     MATCHED,
@@ -26,7 +26,7 @@ pub enum SlacStatus {
     IDLE,
 }
 
-pub fn slac_registers() -> Result <(), AfbError> {
+pub fn slac_registers() -> Result<(), AfbError> {
     // add binding custom converter
     slac_status::register()?;
     Ok(())

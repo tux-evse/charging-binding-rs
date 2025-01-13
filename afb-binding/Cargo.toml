@@ -13,8 +13,12 @@ serde_json={ version= "1.0"}
 charging= {path ="../chmgr-lib"}
 typesv4= {path ="../afb-types"}
 
+[features]
+# enable debugging verbs, to be commented for final production version
+debug = []
 
 [lib]
 name = "afb_chmgr"
 crate-type = ["cdylib"]
 path = "src/libso.rs"
+

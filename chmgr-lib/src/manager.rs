@@ -339,6 +339,22 @@ impl ManagerHandle {
         Ok(())
     }
 
+    #[cfg(debug_assertions)]
+    pub fn set_plug_state(&self, plug_state: PlugState) -> Result<(), AfbError> {
+        let mut data_set = self.get_state()?;
+        data_set.plugged = plug_state;
+        self.event.push(ChargingMsg::Plugged(plug_state));
+        Ok(())
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn set_power_request_state(&self, state: PowerRequest) -> Result<(), AfbError> {
+        let mut data_set = self.get_state()?;
+        data_set.power = state;
+        self.event.push(ChargingMsg::Power(state));
+        Ok(())
+    }
+
     pub fn iec(&self, evt: &AfbEventMsg, msg: &Iec6185Msg) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
         match msg {

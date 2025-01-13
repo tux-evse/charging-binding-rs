@@ -92,16 +92,46 @@ fn slac_event_cb(evt: &AfbEventMsg, args: &AfbRqtData, ctx: &AfbCtxData) -> Resu
     Ok(())
 }
 
+#[cfg(feature = "debug")]
+struct DebugEvtCtx {
+    mgr: &'static ManagerHandle,
+}
+
+#[cfg(feature = "debug")]
 fn on_set_slac_status(
     rqt: &AfbRequest,
     args: &AfbRqtData,
     ctx: &AfbCtxData,
 ) -> Result<(), AfbError> {
-    let ctx = ctx.get_ref::<SlacEvtCtx>()?;
-    let msg = args.get::<&SlacStatus>(0)?;
+    let ctx = ctx.get_ref::<DebugEvtCtx>()?;
+    let arg: &SlacStatus = args.get::<&SlacStatus>(0)?;
+    ctx.mgr.slac(rqt.get_apiv4(), arg)?;
+    rqt.reply(AFB_NO_DATA, 0);
+    Ok(())
+}
 
-    afb_log_msg!(Debug, rqt, "set_slac_state:{:?}", msg);
-    ctx.mgr.slac(rqt.get_apiv4(), msg)?;
+#[cfg(feature = "debug")]
+fn on_set_plug_state(
+    rqt: &AfbRequest,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
+) -> Result<(), AfbError> {
+    let ctx = ctx.get_ref::<DebugEvtCtx>()?;
+    let state: &PlugState = args.get::<&PlugState>(0)?;
+    ctx.mgr.set_plug_state(*state)?;
+    rqt.reply(AFB_NO_DATA, 0);
+    Ok(())
+}
+
+#[cfg(feature = "debug")]
+fn on_set_power_request_state(
+    rqt: &AfbRequest,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
+) -> Result<(), AfbError> {
+    let ctx = ctx.get_ref::<DebugEvtCtx>()?;
+    let state: &PowerRequest = args.get::<&PowerRequest>(0)?;
+    ctx.mgr.set_power_request_state(*state)?;
     rqt.reply(AFB_NO_DATA, 0);
     Ok(())
 }
@@ -300,12 +330,6 @@ pub(crate) fn register_verbs(
         .set_context(PaymentOptionCtx { mgr: manager })
         .finalize()?;
 
-    let set_slac_state_verb = AfbVerb::new("set_slac_status")
-        .set_info("Set SLAC Status")
-        .set_callback(on_set_slac_status)
-        .set_context(SlacEvtCtx { mgr: manager })
-        .finalize()?;
-
     let iec_handler = AfbEvtHandler::new("iec-evt")
         .set_pattern(to_static_str(format!("{}/*", config.iec_api)))
         .set_callback(iec_event_cb)
@@ -367,7 +391,54 @@ pub(crate) fn register_verbs(
     api.add_verb(subscribe_verb);
     api.add_verb(payment_option_verb);
     api.add_verb(remote_power_verb);
-    api.add_verb(set_slac_state_verb);
 
+    #[cfg(feature = "debug")]
+    {
+        let dbg_group = AfbGroup::new("debug");
+
+        let set_slac_state_verb = AfbVerb::new("set-slac-status")
+            .set_info("Set SLAC Status")
+            .set_callback(on_set_slac_status)
+            .set_context(DebugEvtCtx { mgr: manager })
+            .add_sample("matched")?
+            .add_sample("matching")?
+            .add_sample("unmatched")?
+            .add_sample("waiting")?
+            .add_sample("joining")?
+            .add_sample("timeout")?
+            .add_sample("idle")?
+            .finalize()?;
+
+        let set_plug_state_verb = AfbVerb::new("set-plug-state")
+            .set_info("Set Plug state")
+            .set_callback(on_set_plug_state)
+            .set_context(DebugEvtCtx { mgr: manager })
+            .add_sample("plugin")?
+            .add_sample("lock")?
+            .add_sample("error")?
+            .add_sample("plugout")?
+            .add_sample("unknown")?
+            .finalize()?;
+
+        let set_power_request_state_verb = AfbVerb::new("set-power-request-state")
+            .set_info("Set Power request state")
+            .set_callback(on_set_power_request_state)
+            .set_context(DebugEvtCtx { mgr: manager })
+            .add_sample("start")?
+            .add_sample("{\"charging\":32}")?
+            .add_sample("{\"stop\":42}")?
+            .add_sample("idle")?
+            .finalize()?;
+
+        dbg_group.add_verb(set_slac_state_verb);
+        dbg_group.add_verb(set_plug_state_verb);
+        dbg_group.add_verb(set_power_request_state_verb);
+        api.add_group(dbg_group);
+
+        let m = PowerRequest::Start;
+        println!("== {}", serde_json::to_string(&m).unwrap());
+        let m = PowerRequest::Charging(32);
+        println!("== {}", serde_json::to_string(&m).unwrap());
+    }
     Ok(())
 }

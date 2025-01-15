@@ -370,8 +370,6 @@ impl ManagerHandle {
                 if *value {
                     // vehicle start charging
                     data_set.power = PowerRequest::Charging(data_set.imax);
-                    self.charging_protocol(&mut data_set)?;
-
                     if matches!(data_set.iso, IsoState::Iec) {
                         AfbSubCall::call_sync(
                             evt.get_apiv4(),
@@ -401,6 +399,13 @@ impl ManagerHandle {
                     data_set.plugged = PlugState::PlugOut;
                 }
                 self.event.push(ChargingMsg::Power(data_set.power));
+                // Avoid charging type message in cp status C => B
+                match data_set.power {
+                    PowerRequest::Charging(_) => {
+                        self.charging_protocol(&mut data_set)?;
+                    }
+                    _ => {}
+                }
             }
             Iec6185Msg::Plugged(value) => {
                 // reset authentication and energy session values

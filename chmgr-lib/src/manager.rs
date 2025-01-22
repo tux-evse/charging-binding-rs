@@ -205,7 +205,7 @@ impl ManagerHandle {
     pub fn slac(&self, api: AfbApiV4, msg: &SlacStatus) -> Result<(), AfbError> {
         // Inform the firmware that SLAC failed
         match msg {
-            SlacStatus::TIMEOUT | SlacStatus::UNMATCHED | SlacStatus::IDLE => {
+            SlacStatus::TIMEOUT => {
                 AfbSubCall::call_sync(api, self.iec_api, "slac", *msg)?;
             }
             _ => {}

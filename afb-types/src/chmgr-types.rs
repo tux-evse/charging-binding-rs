@@ -38,7 +38,6 @@ pub enum PowerRequest {
     Idle,
 }
 
-
 AfbDataConverter!(power_limit, PowerLimit);
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
@@ -63,6 +62,7 @@ pub enum PlugState {
 #[serde(rename_all = "lowercase")]
 pub enum IsoState {
     Iso20,
+    Iso20Discharge,
     Iso2,
     Iso3,
     Iec,
@@ -82,6 +82,8 @@ pub enum ChargingProtocol {
     BasicCharge,
     SmartCharge,
     PlugAndCharge,
+    Vehicle2Grid,
+    Grid2Vehicle,
 }
 
 AfbDataConverter!(charging_event, ChargingMsg);
@@ -95,7 +97,7 @@ pub enum ChargingMsg {
     State(ChargingState),
     Reservation(ReservationStatus),
     Protocol(ChargingProtocol),
-    Payment(PaymentOption)
+    Payment(PaymentOption),
 }
 
 AfbDataConverter!(reservation_state, ReservationState);
@@ -135,7 +137,7 @@ impl ChargingState {
             iso: IsoState::Unset,
             auth: AuthMsg::Idle,
             reservation: None,
-            payment: None
+            payment: None,
         }
     }
 }
@@ -171,9 +173,9 @@ AfbDataConverter!(reservation_session, ReservationSession);
 #[serde(rename_all = "lowercase")]
 pub struct ReservationSession {
     pub id: i32,
-    pub tagid:String,
+    pub tagid: String,
     pub start: Duration,
-    pub stop:  Duration,
+    pub stop: Duration,
     pub status: ReservationStatus,
 }
 

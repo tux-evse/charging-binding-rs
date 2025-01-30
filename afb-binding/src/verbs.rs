@@ -171,6 +171,19 @@ fn state_request_cb(rqt: &AfbRequest, args: &AfbRqtData, ctx: &AfbCtxData) -> Re
     Ok(())
 }
 
+struct IsoStateCtx {
+    mgr: &'static ManagerHandle,
+}
+
+fn iso_state_cb(rqt: &AfbRequest, args: &AfbRqtData, ctx: &AfbCtxData) -> Result<(), AfbError> {
+    let ctx = ctx.get_ref::<IsoStateCtx>()?;
+    let msg = args.get::<&ChargingMsg>(0)?;
+
+    ctx.mgr.set_iso_state(msg)?;
+    rqt.reply(AFB_NO_DATA, 0);
+    Ok(())
+}
+
 struct PaymentOptionCtx {
     mgr: &'static ManagerHandle,
 }
@@ -294,6 +307,12 @@ pub(crate) fn register_verbs(
         .set_usage("true|false")
         .finalize()?;
 
+    let iso_state_verb = AfbVerb::new("iso-state")
+        .set_info("selected iso state")
+        .set_callback(iso_state_cb)
+        .set_context(IsoStateCtx { mgr: manager })
+        .finalize()?;
+
     let payment_option_verb = AfbVerb::new("payment-option")
         .set_info("selected payment option")
         .set_callback(payment_option_cb)
@@ -365,6 +384,7 @@ pub(crate) fn register_verbs(
     api.add_verb(state_verb);
     api.add_verb(reserve_verb);
     api.add_verb(subscribe_verb);
+    api.add_verb(iso_state_verb);
     api.add_verb(payment_option_verb);
     api.add_verb(remote_power_verb);
     api.add_verb(set_slac_state_verb);

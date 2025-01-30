@@ -175,6 +175,16 @@ impl ManagerHandle {
         Ok(())
     }
 
+    pub fn set_iso_state(&self, msg: &ChargingMsg) -> Result<(), AfbError> {
+        let mut data_set = self.get_state()?;
+
+        if let ChargingMsg::Iso(iso_state) = msg {
+            data_set.iso = *iso_state;
+        }
+
+        Ok(())
+    }
+
     pub fn set_payment_option(&self, msg: &ChargingMsg) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
 
@@ -186,17 +196,22 @@ impl ManagerHandle {
     }
 
     fn charging_protocol(&self, data_set: &mut MutexGuard<ChargingState>) -> Result<(), AfbError> {
-        let charging_type = match data_set.payment {
-            Some(PaymentOption::Pnc) => ChargingProtocol::PlugAndCharge,
-            Some(PaymentOption::Eim) => ChargingProtocol::SmartCharge,
-            _ => match data_set.iso {
-                IsoState::Iec => ChargingProtocol::BasicCharge,
-                _ => {
-                    afb_log_msg!(Warning, self.event, "Invalid charging protocol.");
-                    return Ok(());
+        let charging_type = match data_set.iso {
+            IsoState::Iso2 => {
+                match data_set.payment {
+                    Some(PaymentOption::Pnc) => ChargingProtocol::PlugAndCharge,
+                    Some(PaymentOption::Eim) => ChargingProtocol::SmartCharge,
+                    _ => {
+                        afb_log_msg!(Warning, self.event, "Invalid payment option.");
+                        ChargingProtocol::BasicCharge
+                    },
                 }
             },
+            IsoState::Iso20 => ChargingProtocol::Vehicle2Grid,
+            IsoState::Iec => ChargingProtocol::BasicCharge,
+            _ => ChargingProtocol::BasicCharge,
         };
+
         self.event.push(ChargingMsg::Protocol(charging_type));
         data_set.payment = None;
         Ok(())

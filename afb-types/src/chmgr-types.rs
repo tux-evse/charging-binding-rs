@@ -82,6 +82,8 @@ pub enum ChargingProtocol {
     BasicCharge,
     SmartCharge,
     PlugAndCharge,
+    Vehicle2Grid,
+    Grid2Vehicle,
 }
 
 AfbDataConverter!(charging_event, ChargingMsg);

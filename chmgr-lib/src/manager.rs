@@ -207,7 +207,7 @@ impl ManagerHandle {
                     },
                 }
             },
-            IsoState::Iso20 => ChargingProtocol::Vehicle2Grid,
+            IsoState::Iso20 => ChargingProtocol::Grid2Vehicle,
             IsoState::Iec => ChargingProtocol::BasicCharge,
             _ => ChargingProtocol::BasicCharge,
         };

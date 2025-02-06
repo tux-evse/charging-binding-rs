@@ -63,6 +63,7 @@ pub enum PlugState {
 #[serde(rename_all = "lowercase")]
 pub enum IsoState {
     Iso20,
+    Iso20Discharge,
     Iso2,
     Iso3,
     Iec,
@@ -82,6 +83,8 @@ pub enum ChargingProtocol {
     BasicCharge,
     SmartCharge,
     PlugAndCharge,
+    Vehicle2Grid,
+    Grid2Vehicle,
 }
 
 AfbDataConverter!(charging_event, ChargingMsg);

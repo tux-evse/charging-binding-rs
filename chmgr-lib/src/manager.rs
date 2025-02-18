@@ -175,6 +175,33 @@ impl ManagerHandle {
         Ok(())
     }
 
+    pub fn set_iso_state(&self, msg: &ChargingMsg) -> Result<(), AfbError> {
+        let mut data_set = self.get_state()?;
+
+        if let ChargingMsg::Iso(iso_state) = msg {
+            let previous_iso_state = data_set.iso;
+            data_set.iso = *iso_state;
+            match iso_state {
+                IsoState::Iso20Discharge => {
+                    // In case of discharge, push a protocol message to change the display
+                    self.charging_protocol(&mut data_set)?;
+                }
+                IsoState::Iso20 => {
+                    // if positive power is requested again (iso20) during discharge, switch back to charge
+                    match previous_iso_state {
+                        IsoState::Iso20Discharge => {
+                            self.charging_protocol(&mut data_set)?;
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            };
+        }
+
+        Ok(())
+    }
+
     pub fn set_payment_option(&self, msg: &ChargingMsg) -> Result<(), AfbError> {
         let mut data_set = self.get_state()?;
 
@@ -186,17 +213,21 @@ impl ManagerHandle {
     }
 
     fn charging_protocol(&self, data_set: &mut MutexGuard<ChargingState>) -> Result<(), AfbError> {
-        let charging_type = match data_set.payment {
-            Some(PaymentOption::Pnc) => ChargingProtocol::PlugAndCharge,
-            Some(PaymentOption::Eim) => ChargingProtocol::SmartCharge,
-            _ => match data_set.iso {
-                IsoState::Iec => ChargingProtocol::BasicCharge,
+        let charging_type = match data_set.iso {
+            IsoState::Iso2 => match data_set.payment {
+                Some(PaymentOption::Pnc) => ChargingProtocol::PlugAndCharge,
+                Some(PaymentOption::Eim) => ChargingProtocol::SmartCharge,
                 _ => {
-                    afb_log_msg!(Warning, self.event, "Invalid charging protocol.");
-                    return Ok(());
+                    afb_log_msg!(Warning, self.event, "Invalid payment option.");
+                    ChargingProtocol::BasicCharge
                 }
             },
+            IsoState::Iso20 => ChargingProtocol::Grid2Vehicle,
+            IsoState::Iso20Discharge => ChargingProtocol::Vehicle2Grid,
+            IsoState::Iec => ChargingProtocol::BasicCharge,
+            _ => ChargingProtocol::BasicCharge,
         };
+
         self.event.push(ChargingMsg::Protocol(charging_type));
         data_set.payment = None;
         Ok(())
@@ -210,7 +241,7 @@ impl ManagerHandle {
             }
             _ => {}
         }
-        
+
         let mut state = self.get_state()?;
         let iso_state = match msg {
             SlacStatus::MATCHED => {

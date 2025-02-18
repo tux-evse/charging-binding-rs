@@ -201,6 +201,23 @@ fn payment_option_cb(
     Ok(())
 }
 
+struct ServiceStatusCtx {
+    mgr: &'static ManagerHandle,
+}
+
+fn set_service_status_cb(
+    rqt: &AfbRequest,
+    args: &AfbRqtData,
+    ctx: &AfbCtxData,
+) -> Result<(), AfbError> {
+    let ctx = ctx.get_ref::<ServiceStatusCtx>()?;
+    let service_name = args.get::<String>(0)?;
+    let status = args.get::<&ServiceStatus>(1)?;
+    ctx.mgr.set_service_status(&service_name, status.clone());
+    rqt.reply(AFB_NO_DATA, 0);
+    Ok(())
+}
+
 struct ReserveChargerCtx {
     mgr: &'static ManagerHandle,
 }
@@ -379,6 +396,12 @@ pub(crate) fn register_verbs(
             .finalize()?;
         api.add_evt_handler(slac_handler);
     }
+
+    let set_service_status_verb = AfbVerb::new("set-service-status")
+        .set_info("Notify of a service status")
+        .set_callback(set_service_status_cb)
+        .set_context(ServiceStatusCtx { mgr: manager })
+        .finalize()?;
     api.add_event(msg_evt);
     api.add_event(state_event);
     api.add_verb(state_verb);
@@ -388,6 +411,7 @@ pub(crate) fn register_verbs(
     api.add_verb(payment_option_verb);
     api.add_verb(remote_power_verb);
     api.add_verb(set_slac_state_verb);
+    api.add_verb(set_service_status_verb);
 
     Ok(())
 }

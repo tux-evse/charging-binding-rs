@@ -86,6 +86,16 @@ pub enum ChargingProtocol {
     Grid2Vehicle,
 }
 
+AfbDataConverter!(service_status, ServiceStatus);
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum ServiceStatus {
+    Ready,
+    Starting,
+    Stopping,
+    Error,
+}
+
 AfbDataConverter!(charging_event, ChargingMsg);
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -98,6 +108,7 @@ pub enum ChargingMsg {
     Reservation(ReservationStatus),
     Protocol(ChargingProtocol),
     Payment(PaymentOption),
+    ServiceStatus { name: String, status: ServiceStatus },
 }
 
 AfbDataConverter!(reservation_state, ReservationState);
@@ -189,6 +200,7 @@ pub fn chmgr_registers() -> Result<(), AfbError> {
     reservation_session::register()?;
     reservation_state::register()?;
     power_limit::register()?;
+    service_status::register()?;
 
     Ok(())
 }

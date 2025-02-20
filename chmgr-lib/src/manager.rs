@@ -212,6 +212,13 @@ impl ManagerHandle {
         Ok(())
     }
 
+    pub fn set_service_status(&self, service_name: &str, status: ServiceStatus) {
+        self.event.push(ChargingMsg::ServiceStatus {
+            name: service_name.to_string(),
+            status,
+        });
+    }
+
     fn charging_protocol(&self, data_set: &mut MutexGuard<ChargingState>) -> Result<(), AfbError> {
         let charging_type = match data_set.iso {
             IsoState::Iso2 => match data_set.payment {
